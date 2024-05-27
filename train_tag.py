@@ -1,4 +1,7 @@
 """Self Play
+```
+python train_tag.py --algo sac --n_round 500 --max_steps 400 --seed 0
+```
 """
 
 import argparse
@@ -16,7 +19,7 @@ from env.mpe.make_env import make_env
 
 os.environ["WANDB_START_METHOD"] = "thread"
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = "1"
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 tf.disable_v2_behavior()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +69,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    import wandb
+    wdb = wandb.init(project="MF-PE", resume="allow", name=f"tag/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
+    
     setup_seed(seed=args.seed)
     # Initialize the environment
     
@@ -74,12 +80,12 @@ if __name__ == '__main__':
     tf_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
     tf_config.gpu_options.allow_growth = True
 
-    log_dir = os.path.join(BASE_DIR,'data/tmp/{}_{}'.format(args.algo, args.seed))
-    model_dir = os.path.join(BASE_DIR, 'data/models/{}_{}'.format(args.algo, args.seed))
+    log_dir = os.path.join(BASE_DIR,'data/tmp/tag/{}_{}'.format(args.algo, args.seed))
+    model_dir = os.path.join(BASE_DIR, 'data/models/tag/{}_{}'.format(args.algo, args.seed))
 
     if 'mf' in args.algo:
-        log_dir = os.path.join(BASE_DIR,f'data/tmp/{args.algo}_{args.order}_{args.seed}')
-        model_dir = os.path.join(BASE_DIR, f'data/models/{args.algo}_{args.order}_{args.seed}')
+        log_dir = os.path.join(BASE_DIR,f'data/tmp/tag/{args.algo}_{args.order}_{args.seed}')
+        model_dir = os.path.join(BASE_DIR, f'data/models/tag/{args.algo}_{args.order}_{args.seed}')
 
     start_from = 0
 

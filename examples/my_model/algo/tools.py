@@ -106,7 +106,7 @@ class EpisodesBuffer(Buffer):
 
     def push(self, **kwargs):
         state = kwargs['state']
-        acts = kwargs['acts']
+        actions = kwargs['actions']
         rewards = kwargs['rewards']
         dones = kwargs['dones']
         values = kwargs['values']
@@ -125,11 +125,11 @@ class EpisodesBuffer(Buffer):
                 self.buffer[i] = entry
             
             if self.use_g:
-                entry.append(state[i], acts[i], rewards[i], dones[i], values[i], logps[i], meanaction=meanaction[i], g=g[i])
+                entry.append(state[i], actions[i], rewards[i], dones[i], values[i], logps[i], meanaction=meanaction[i], g=g[i])
             elif self.use_mean:
-                entry.append(state[i], acts[i], rewards[i], dones[i], values[i], logps[i], meanaction=meanaction[i])
+                entry.append(state[i], actions[i], rewards[i], dones[i], values[i], logps[i], meanaction=meanaction[i])
             else:
-                entry.append(state[i], acts[i], rewards[i], dones[i], values[i], logps[i])
+                entry.append(state[i], actions[i], rewards[i], dones[i], values[i], logps[i])
 
 
     def reset(self):
@@ -140,66 +140,56 @@ class EpisodesBuffer(Buffer):
         """ get episodes """
         return self.buffer.values()
 
-
 class AgentMemory(object):
-    def __init__(self, obs_dim, act_dim, max_len, use_mean=False):
-        self.state = MetaBuffer((obs_dim,), max_len)
-        self.actions = MetaBuffer((act_dim,), max_len)
+    def __init__(self, obs_shape, act_n, max_len, act_dim=1):
+        self.state = MetaBuffer(obs_shape, max_len)
+        self.actions = MetaBuffer((), max_len)
         self.rewards = MetaBuffer((), max_len)
         self.terminals = MetaBuffer((), max_len, dtype='bool')
-        self.use_mean = use_mean
-
-        if self.use_mean:
-            self.meanaction = MetaBuffer((act_dim,), max_len)
+        self.prob = MetaBuffer((act_n,), max_len)
 
     def append(self, state, act, reward, done, prob=None):
         self.state.append(np.array([state]))
         self.actions.append(np.array([act]))
         self.rewards.append(np.array([reward]))
         self.terminals.append(np.array([done], dtype=np.bool))
-
-        if self.use_mean:
-            self.meanaction.append(np.array([prob]))
+        self.prob.append(np.array([prob]))
 
     def pull(self):
         res = {
             'state': self.state.pull(),
-            'acts': self.actions.pull(),
+            'actions': self.actions.pull(),
             'rewards': self.rewards.pull(),
             'dones': self.terminals.pull(),
-            'meanaction': None if not self.use_mean else self.meanaction.pull(),
+            'prob': self.prob.pull(),
         }
 
         return res
 
-
 class MemoryGroup(object):
-    def __init__(self, obs_dim, act_dim, max_len, batch_size, sub_len, use_mean=False):
+    def __init__(self, obs_shape, act_n, max_len, batch_size, sub_len, act_dim=1):
         self.agent = dict()
         self.max_len = max_len
         self.batch_size = batch_size
-        self.obs_dim = obs_dim
+        self.obs_shape = obs_shape
         self.sub_len = sub_len
-        self.use_mean = use_mean
-        self.act_dim = act_dim
+        self.act_n = act_n
 
-        self.state = MetaBuffer((obs_dim,), max_len)
-        self.actions = MetaBuffer((act_dim,), max_len)
+        self.state = MetaBuffer(obs_shape, max_len)
+        self.actions = MetaBuffer((), max_len, dtype='int32')
         self.rewards = MetaBuffer((), max_len)
         self.terminals = MetaBuffer((), max_len, dtype='bool')
         self.masks = MetaBuffer((), max_len, dtype='bool')
-        if use_mean:
-            self.meanaction = MetaBuffer((act_dim,), max_len)
+        self.prob = MetaBuffer((act_n,), max_len)
         self._new_add = 0
 
     def _flush(self, **kwargs):
         self.state.append(kwargs['state'])
-        self.actions.append(kwargs['acts'])
+        self.actions.append(kwargs['actions'])
         self.rewards.append(kwargs['rewards'])
         self.terminals.append(kwargs['dones'])
 
-        if self.use_mean:
-            self.meanaction.append(kwargs['meanaction'])
+        self.prob.append(kwargs['prob'])
 
         mask = np.where(kwargs['dones'] == True, False, True)
         mask[-1] = False
@@ -208,11 +198,8 @@ class MemoryGroup(object):
     def push(self, **kwargs):
         for i, _id in enumerate(kwargs['ids']):
             if self.agent.get(_id) is None:
-                self.agent[_id] = AgentMemory(self.obs_dim, self.act_dim, self.sub_len, use_mean=self.use_mean)
-            if self.use_mean:
-                self.agent[_id].append(state=kwargs['state'][i], act=kwargs['acts'][i], reward=kwargs['rewards'][i], done=kwargs['dones'][i], prob=kwargs['prob'][i])
-            else:
-                self.agent[_id].append(state=kwargs['state'][i], act=kwargs['acts'][i], reward=kwargs['rewards'][i], done=kwargs['dones'][i])
+                self.agent[_id] = AgentMemory(self.obs_shape, self.act_n, self.sub_len)
+            self.agent[_id].append(state=kwargs['state'][i], act=kwargs['actions'][i], reward=kwargs['rewards'][i], done=kwargs['dones'][i], prob=kwargs['prob'][i])
 
     def tight(self):
         ids = list(self.agent.keys())
@@ -224,6 +211,12 @@ class MemoryGroup(object):
         self.agent = dict()  # clear
 
     def sample(self):
+        """_summary_
+
+        Returns:
+            obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
+            _type_: _description_
+        """
         idx = np.random.choice(self.nb_entries, size=self.batch_size)
         next_idx = (idx + 1) % self.nb_entries
 
@@ -234,12 +227,12 @@ class MemoryGroup(object):
         dones = self.terminals.sample(idx)
         masks = self.masks.sample(idx)
 
-        if self.use_mean:
-            act_prob = self.prob.sample(idx)
-            act_next_prob = self.prob.sample(next_idx)
-            return obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
-        else:
-            return obs, obs_next, dones, rewards, actions, masks
+        # if self.use_mean:
+        act_prob = self.prob.sample(idx)
+        act_next_prob = self.prob.sample(next_idx)
+        return obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
+        # else:
+        #     return obs, obs_next, dones, rewards, actions, masks
 
     def get_batch_num(self):
         print('\n[INFO] Length of buffer and new add:', len(self.state), self._new_add)
@@ -376,7 +369,10 @@ class Runner(object):
         info = {'predator': {'mean_reward': 0.},
                 'prey': {'mean_reward': 0.}}
 
-        render = (iteration + 1) % self.render_every if self.render_every > 0 else False
+        render = (iteration + 1) % self.render_every == 0 if self.render_every > 0 else False
+        render = render and not self.train
+        if render:
+            print(f'Render @iter{iteration}')
         mean_rewards = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,
                     models=self.models, print_every=50, eps=variant_eps, render=render, train=self.train)
 
