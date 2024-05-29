@@ -60,7 +60,7 @@ def linear_decay(epoch, x, y):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--algo', type=str, choices={'attention_mfq', 'ac', 'mfac', 'mfq', 'il', 'me_mfq','me_mfq_leg','ppo','sac'}, help='choose an algorithm from the preset', required=True)
+    parser.add_argument('--algo', type=str, choices={'attention_mfq', 'ac', 'mfac', 'mfq', 'dqn', 'me_mfq','me_mfq_leg','ppo','sac'}, help='choose an algorithm from the preset', required=True)
     parser.add_argument('--save_every', type=int, default=50, help='decide the self-play update interval')
     parser.add_argument('--update_every', type=int, default=5, help='decide the udpate interval for q-learning, optional')
     parser.add_argument('--n_round', type=int, default=500, help='set the trainning round')
@@ -69,11 +69,12 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int, default=400, help='set the max steps')
     parser.add_argument('--seed', type=int, default=1, help='random seed')
     parser.add_argument('--order', type=int, default=4, help='moment order')
+    parser.add_argument('--use_wandb', type=bool, default=False, help='log onto wandb or not')
 
     args = parser.parse_args()
-    
-    import wandb
-    wdb = wandb.init(project="MF-PE", resume="allow", name=f"my/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
+    if args.use_wandb:
+        import wandb
+        wdb = wandb.init(project="MF-PE", resume="allow", name=f"myv5/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
 
     # set_seed(args.seed)
     # Initialize the environment    
@@ -104,7 +105,7 @@ if __name__ == '__main__':
     sess.run(tf.global_variables_initializer())
     runner = tools.Runner(sess, env, None, args.map_size, args.max_steps, models, play,
                             render_every=args.save_every if args.render else 0, save_every=args.save_every, tau=0.01, log_name=args.algo,
-                            log_dir=log_dir, model_dir=model_dir, train=True)
+                            log_dir=log_dir, model_dir=model_dir, train=True, use_wandb=args.use_wandb)
 
     print("\n\n=== {0} ROUNDs x {1} STEPs ===".format(args.n_round, args.max_steps))
     args.n_round

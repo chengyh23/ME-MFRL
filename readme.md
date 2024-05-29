@@ -14,6 +14,11 @@ pip install -e .
 ```
 
 # Scripts
+## train in my
+```shell
+python train_my.py --algo sac --n_round 500 --max_steps 400
+```
+
 ## train in tag
 ```shell
 python train_tag --algo me_mfppo --order 4

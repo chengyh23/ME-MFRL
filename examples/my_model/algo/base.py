@@ -160,7 +160,7 @@ class ValueNet:
                 actions = np.argmax(pi, axis=1).astype(np.int32)
         else:
             actions = np.argmax(pi, axis=1).astype(np.int32)
-        return actions, pi
+        return actions, None, None
 
     def train(self, **kwargs):
         """Train the model

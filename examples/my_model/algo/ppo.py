@@ -240,7 +240,7 @@ class DiscretePPO:
         self.name = name
         self.state_dim = env.observation_space[0].shape[0] if 'predator' in name else env.observation_space[-1].shape[0]
         # self.action_dim = env.action_space[0].shape[0] if 'predator' in name else env.action_space[-1].shape[0]   # Continuous action space
-        self.action_dim = env.action_space[0].n    # Discrete action space
+        self.action_dim = env.action_space[0].n if 'predator' in name else env.action_space[-1].n   # Discrete action space
         self.gamma = gamma
         self.lam = 0.99
         self.target_kl = 0.01
@@ -283,23 +283,30 @@ class DiscretePPO:
         # return a, v, logp_pi
         
         # Discrete Action space
-        pi = self.sess.run(self.mu, inputs)
-        if kwargs['train']:
-            # decay epsilon-greedy
-            if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
-                actions = np.random.randint(0, self.action_dim, size=pi.shape[0], dtype=np.int32)
-            else:
-                actions = np.argmax(pi, axis=1).astype(np.int32)
-        else:
-            actions = np.argmax(pi, axis=1).astype(np.int32)
+        pi, v, logp_pi = self.sess.run([self.pi, self.v, self.logp_pi], inputs)
+        # pi = self.sess.run(self.pi, inputs)
         
-        return actions, pi
+        # if kwargs['train']:
+        #     # decay epsilon-greedy
+        #     if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
+        #         actions = np.random.randint(0, self.action_dim, size=pi.shape[0], dtype=np.int32)
+        #     else:
+        #         actions = np.argmax(pi, axis=1).astype(np.int32)
+        # else:
+        #     actions = np.argmax(pi, axis=1).astype(np.int32)
+        actions = []
+        for prob in pi:
+            action = np.random.choice(len(prob), p=prob)
+            actions.append(action)
+        actions = np.array(actions)
+        
+        return actions, v, logp_pi
     
-    def act_test(self, **kwargs): 
-        inputs = {self.s_ph:kwargs['obs']} 
-        a = self.sess.run(self.mu, inputs)
-        a = np.clip(a, -1, 1)
-        return a, None, None
+    # def act_test(self, **kwargs): 
+    #     inputs = {self.s_ph:kwargs['obs']} 
+    #     a = self.sess.run(self.pi, inputs)
+    #     a = np.clip(a, -1, 1)
+    #     return a, None, None
     
     def get_v(self, **kwargs):
         inputs = {self.s_ph:kwargs['state']}  
@@ -308,6 +315,7 @@ class DiscretePPO:
     def _create_network(self):
         self.s_ph = tf.placeholder(tf.float32, [None, self.state_dim], name="State-Input")
         self.a_ph = tf.placeholder(tf.int32, (None,), name="Action-Input")
+        # self.a_ph = tf.placeholder(tf.int32, [None, self.action_dim], name="Action-Input")
         self.adv_ph = tf.placeholder(tf.float32, (None,))
         self.ret_ph = tf.placeholder(tf.float32, (None,))
         self.logp_old_ph = tf.placeholder(tf.float32, (None,))
@@ -317,14 +325,26 @@ class DiscretePPO:
         # actor critic
         x_pi = tf.layers.dense(self.s_ph, 256, tf.nn.relu)
         x_pi = tf.layers.dense(x_pi, 64, tf.nn.relu)
-        mu = tf.layers.dense(x_pi, self.action_dim, tf.nn.softmax)
+        pi = tf.layers.dense(x_pi, self.action_dim, tf.nn.softmax)
         # log_std = tf.get_variable(name='log_std', initializer=LOG_STD*np.ones(self.action_dim, dtype=np.float32))
         # std = tf.exp(log_std)
         # self.pi = mu + tf.random_normal(tf.shape(mu)) * std
         # self.logp = gaussian_likelihood(self.a_ph, mu, log_std)
         # self.logp_pi = gaussian_likelihood(self.pi, mu, log_std)
-        self.mu = mu
-        self.logp = tf.log(tf.gather(mu,self.a_ph,axis=1))
+        self.pi = pi
+        
+        N = tf.shape(self.a_ph)[0]
+        indices = tf.reshape(self.a_ph, [N, 1])
+        row_indices = tf.reshape(tf.range(N, dtype=tf.int32), [N, 1])
+        gather_indices = tf.concat([row_indices, indices], axis=1)
+        self.logp = tf.gather_nd(pi, gather_indices)
+        N = tf.shape(self.pi)[0]
+        indices = tf.reshape(tf.argmax(self.pi,axis=1,output_type=tf.int32), [N, 1])
+        row_indices = tf.reshape(tf.range(N, dtype=tf.int32), [N, 1])
+        gather_indices = tf.concat([row_indices, indices], axis=1)
+        self.logp_pi = tf.gather_nd(pi, gather_indices)
+        # self.logp = tf.log(tf.gather(pi,self.a_ph,axis=1))
+        # self.logp_pi = tf.log(tf.gather(pi,tf.argmax(self.pi,axis=1),axis=1))
     
         x_v = tf.layers.dense(self.s_ph, 256, tf.nn.relu)
         self.v = tf.layers.dense(x_v, 1)

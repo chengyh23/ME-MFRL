@@ -28,7 +28,8 @@ class ReplayBuffer:
     def __init__(self, obs_dim, act_dim, size):
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
+        self.acts_buf = np.zeros(size, dtype=np.int32)
+        # self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
         self.rews_buf = np.zeros(size, dtype=np.float32)
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
@@ -260,7 +261,7 @@ class DiscreteSAC:
         self.name = name
         self.state_dim = env.observation_space[0].shape[0] if 'predator' in name else env.observation_space[-1].shape[0]
         # self.action_dim = env.action_space[0].shape[0] if 'predator' in name else env.action_space[-1].shape[0]
-        self.action_dim = env.action_space[0].n    # Discrete action space
+        self.action_dim = env.action_space[0].n if 'predator' in name else env.action_space[-1].n   # Discrete action space
         self.tau = 0.995
         self.gamma = 0.99
         self.alpha = 0.2
@@ -307,51 +308,95 @@ class DiscreteSAC:
     
     def act(self, **kwargs):
         feed_dict = {self.s_ph:kwargs['obs'],
-                     self.a_ph:np.zeros((len(kwargs['obs']),self.action_dim))}  
+                     self.a_ph:np.zeros((len(kwargs['obs']),))}  
         # act_op = self.mu if deterministic else self.pi
         pi = self.sess.run([self.pi], feed_dict)[0]
-        if kwargs['train']:
-            # decay epsilon-greedy
-            if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
-                actions = np.random.randint(0, self.action_dim, size=pi.shape[0], dtype=np.int32)
-            else:
-                actions = np.argmax(pi, axis=1).astype(np.int32)
-        else:
-            actions = np.argmax(pi, axis=1).astype(np.int32)
+        # if kwargs['train']:
+        #     # decay epsilon-greedy
+        #     if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
+        #         actions = np.random.randint(0, self.action_dim, size=pi.shape[0], dtype=np.int32)
+        #     else:
+        #         actions = np.argmax(pi, axis=1).astype(np.int32)
+        # else:
+        #     actions = np.argmax(pi, axis=1).astype(np.int32)
         
-        return actions, pi
+        # # 
+        # actions_dist = tf.distributions.Categorical(pi)
+        # actions = actions_dist.sample()
+        # actions = self.sess.run([actions])[0]
+        
+        # logits = tf.math.log(pi)
+        # actions = tf.random.categorical(logits, 1)
+        # actions = tf.squeeze(actions, axis=1)
+        
+        actions = []
+        for prob in pi:
+            action = np.random.choice(len(prob), p=prob)
+            actions.append(action)
+        actions = np.array(actions)
+        # print(actions)
+        return actions, None, None
     
     
-    def actor_critic(self, x, a, hidden_sizes):
+    def actor_critic(self, x, hidden_sizes):
+        """_summary_
+
+        Args:
+            x (_type_): _description_
+            hidden_sizes (_type_): _description_
+
+        Returns:
+            pi, q1, q2
+        """
         # pi
+        # # 连续动作：策略网络输出一个高斯分布的均值和标准差来表示动作分布；
+        # with tf.variable_scope('pi'):
+        #     x_pi = mlp(x, list(hidden_sizes), activation=tf.nn.relu, output_activation=tf.nn.relu)
+        #     mu = tf.layers.dense(x_pi, self.action_dim, tf.nn.tanh)
+        #     log_std = tf.layers.dense(x_pi, self.action_dim, activation=None)
+        #     log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
+        #     std = tf.exp(log_std)
+        #     pi = mu + tf.random_normal(tf.shape(mu)) * std
+        #     logp_pi = gaussian_likelihood(pi, mu, log_std)
+        #     logp_pi -= tf.reduce_sum(2*(np.log(2) - pi - tf.nn.softplus(-2*pi)), axis=1)
+        #     mu = tf.tanh(mu)
+        #     pi = tf.tanh(pi)
+
+        # mu *= self.action_scale
+        # pi *= self.action_scale
+        
+        # 离散动作：策略网络的输出修改为在离散动作空间上的 softmax 分布；
         with tf.variable_scope('pi'):
             x_pi = mlp(x, list(hidden_sizes), activation=tf.nn.relu, output_activation=tf.nn.relu)
-            mu = tf.layers.dense(x_pi, self.action_dim, tf.nn.tanh)
-            log_std = tf.layers.dense(x_pi, self.action_dim, activation=None)
-            log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
-            std = tf.exp(log_std)
-            pi = mu + tf.random_normal(tf.shape(mu)) * std
-            logp_pi = gaussian_likelihood(pi, mu, log_std)
-            logp_pi -= tf.reduce_sum(2*(np.log(2) - pi - tf.nn.softplus(-2*pi)), axis=1)
-            mu = tf.tanh(mu)
-            pi = tf.tanh(pi)
-
-        mu *= self.action_scale
-        pi *= self.action_scale
-        
+            pi = tf.layers.dense(x_pi, self.action_dim, tf.nn.softmax)
+            
         # vfs
-        vf_mlp = lambda x : tf.squeeze(mlp(x, list(hidden_sizes)+[1], tf.nn.relu, None), axis=1)
+        # # 连续动作
+        # vf_mlp = lambda x : tf.squeeze(mlp(x, list(hidden_sizes)+[1], tf.nn.relu, None), axis=1)
+        # with tf.variable_scope('q1'):
+        #     q1 = vf_mlp(tf.concat([x,a], axis=-1))
+        # with tf.variable_scope('q2'):
+        #     q2 = vf_mlp(tf.concat([x,a], axis=-1))
+        
+        # 离散动作：
         with tf.variable_scope('q1'):
-            q1 = vf_mlp(tf.concat([x,a], axis=-1))
+            x_q1 = mlp(x, list(hidden_sizes), activation=tf.nn.relu, output_activation=tf.nn.relu)
+            q1 = tf.layers.dense(x_q1, self.action_dim, activation=None)
         with tf.variable_scope('q2'):
-            q2 = vf_mlp(tf.concat([x,a], axis=-1))
-
-        return mu, pi, logp_pi, q1, q2
+            x_q2 = mlp(x, list(hidden_sizes), activation=tf.nn.relu, output_activation=tf.nn.relu)
+            q2 = tf.layers.dense(x_q2, self.action_dim, activation=None)
+        # vf_mlp = lambda x : tf.squeeze(mlp(x, list(hidden_sizes)+[self.action_dim], tf.nn.relu, output_activation=None), axis=1)
+        # with tf.variable_scope('q1'):
+        #     q1 = vf_mlp(x)
+        # with tf.variable_scope('q2'):
+        #     q2 = vf_mlp(x)
+            
+        return pi, q1, q2
 
     def _create_network(self):
         self.s_ph = tf.placeholder(tf.float32, [None, self.state_dim])
         self.s2_ph = tf.placeholder(tf.float32, [None, self.state_dim])
-        self.a_ph = tf.placeholder(tf.float32, [None, self.action_dim])
+        self.a_ph = tf.placeholder(tf.int32, (None,))
         self.r_ph = tf.placeholder(tf.float32, (None,))
         self.d_ph = tf.placeholder(tf.float32, (None,))
     
@@ -359,31 +404,53 @@ class DiscreteSAC:
         # self.all_phs = [self.s_ph, self.a_ph, self.adv_ph, self.ret_ph, self.logp_old_ph]
 
         with tf.variable_scope('main'):
-            mu, pi, logp_pi, q1, q2 = self.actor_critic(self.s_ph, self.a_ph, self.hidden_sizes)
+            pi, q1, q2 = self.actor_critic(self.s_ph, self.hidden_sizes)
             self.eval_name = tf.get_variable_scope().name
             self.e_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.eval_name)
-            self.mu = mu
             self.pi = pi
+            logp_pi = tf.log(pi + 1e-8)
 
-        with tf.variable_scope('main', reuse=True):
-            _, _, _, q1_pi, q2_pi = self.actor_critic(self.s_ph, pi, self.hidden_sizes)
-            _, pi_next, logp_pi_next, _, _ = self.actor_critic(self.s2_ph, self.a_ph, self.hidden_sizes)
-
+        # with tf.variable_scope('main', reuse=True):
+        #     _, q1_pi, q2_pi = self.actor_critic(self.s_ph, self.hidden_sizes)
+        #     pi_next, _, _ = self.actor_critic(self.s2_ph, self.hidden_sizes)
+        #     logp_pi_next = tf.log(pi_next + 1e-8)
+            
         with tf.variable_scope('target'):     
-            _, _, _, q1_targ, q2_targ  = self.actor_critic(self.s2_ph, pi_next, self.hidden_sizes)
+            pi_next, q1_targ, q2_targ  = self.actor_critic(self.s2_ph, self.hidden_sizes)
+            # _, q1_targ, q2_targ  = self.actor_critic(self.s2_ph, self.hidden_sizes)
+            logp_pi_next = tf.log(pi_next + 1e-8)
             self.target_name = tf.get_variable_scope().name
             self.t_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.target_name)
 
         # Min Double-Q:
-        min_q_pi = tf.minimum(q1_pi, q2_pi)
-        min_q_targ = tf.minimum(q1_targ, q2_targ)
+        min_q_pi = tf.reduce_sum(pi * tf.minimum(q1, q2), axis=1, keepdims=False)
+        # min_q_pi = tf.reduce_sum(pi * tf.minimum(q1_pi, q2_pi), axis=1, keepdims=False)
+        min_q_targ = tf.reduce_sum(pi_next * tf.minimum(q1_targ, q2_targ), axis=1, keepdims=False)
+        # min_q_pi = tf.minimum(q1_pi, q2_pi)
+        # min_q_targ = tf.minimum(q1_targ, q2_targ)
+        
         # Entropy-regularized Bellman backup for Q functions, using Clipped Double-Q targets
-        q_backup = tf.stop_gradient(self.r_ph + self.gamma*(1-self.d_ph)*(min_q_targ - self.alpha * logp_pi_next))
+        entropy_next = -tf.reduce_sum(pi_next * logp_pi_next, axis=1, keepdims=False)
+        q_backup = tf.stop_gradient(self.r_ph + self.gamma*(1-self.d_ph)*(min_q_targ + self.alpha * entropy_next))
+        # q_backup = tf.stop_gradient(self.r_ph + self.gamma*(1-self.d_ph)*(min_q_targ - self.alpha * logp_pi_next))
 
         # Soft actor-critic losses
-        pi_loss = tf.reduce_mean(self.alpha * logp_pi - min_q_pi)
-        q1_loss = 0.5 * tf.reduce_mean((q_backup - q1)**2)
-        q2_loss = 0.5 * tf.reduce_mean((q_backup - q2)**2)
+        entropy = -tf.reduce_sum(pi * logp_pi, axis=1, keepdims=True)
+        pi_loss = tf.reduce_mean(-self.alpha * entropy - min_q_pi)
+        
+        N = tf.shape(self.a_ph)[0]
+        indices = tf.reshape(self.a_ph, [N, 1])
+        # indices = tf.reshape(tf.argmax(self.a_ph,axis=1,output_type=tf.int32), [N, 1])
+        row_indices = tf.reshape(tf.range(N, dtype=tf.int32), [N, 1])
+        gather_indices = tf.concat([row_indices, indices], axis=1)
+        _q1 = tf.gather_nd(q1, gather_indices)
+        _q2 = tf.gather_nd(q2, gather_indices)
+        # # tf.gather() behaves differently from torch.gather()!
+        # _q1 = tf.gather(q1,tf.argmax(self.a_ph,axis=1),axis=1)
+        # _q2 = tf.gather(q2,tf.argmax(self.a_ph,axis=1),axis=1)
+        
+        q1_loss = 0.5 * tf.reduce_mean((q_backup - _q1)**2)
+        q2_loss = 0.5 * tf.reduce_mean((q_backup - _q2)**2)
         value_loss = q1_loss + q2_loss
 
         actor_lr_decated = tf.train.linear_cosine_decay(self.actor_lr, self.actor_global_step, 1000)
@@ -440,8 +507,9 @@ class DiscreteSAC:
 
             outs = self.sess.run(self.step_ops, feed_dict)
 
-            print('[*] LossPi:', np.round(outs[0], 6), '/ LossQ1:', np.round(outs[1], 6), '/ LossQ2:', np.round(outs[2], 6),
-                  '/ Q1Vals:', np.round(outs[3], 6), '/ Q2Vals:', np.round(outs[4], 6), '/ LogPi:', np.round(outs[5], 6)) 
+            # print('[*] LossPi:', np.round(outs[0], 6), '/ LossQ1:', np.round(outs[1], 6), '/ LossQ2:', np.round(outs[2], 6),
+            #       '/ Q1Vals:', np.round(outs[3], 6), '/ Q2Vals:', np.round(outs[4], 6), '/ LogPi:', np.round(outs[5], 6)) 
+            print('[*] LossPi:', np.round(outs[0], 6), '/ LossQ1:', np.round(outs[1], 6), '/ LossQ2:', np.round(outs[2], 6)) 
 
 
     def save(self, dir_path, step=0):

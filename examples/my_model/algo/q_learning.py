@@ -16,9 +16,9 @@ class Color:
 class DQN(base.ValueNet):
     def __init__(self, sess, name, handle, env, sub_len, memory_size=2**10, batch_size=64, update_every=5):
 
-        super().__init__(sess, env, handle, name, update_every=update_every)
+        super().__init__(sess, name, handle, env, update_every=update_every)
 
-        self.replay_buffer = tools.MemoryGroup(self.view_space, self.feature_space, self.num_actions, memory_size, batch_size, sub_len)
+        self.replay_buffer = tools.MemoryGroup(self.feature_space, self.num_actions, memory_size, batch_size, sub_len)
         self.sess.run(tf.global_variables_initializer())
 
     def flush_buffer(self, **kwargs):

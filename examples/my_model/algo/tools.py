@@ -308,7 +308,7 @@ class SummaryObj:
 
 class Runner(object):
     def __init__(self, sess, env, handles, map_size, max_steps, models,
-                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, train=False, use_moment=True):
+                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, train=False, use_moment=True, use_wandb=False):
         """Initialize runner
 
         Parameters
@@ -350,6 +350,7 @@ class Runner(object):
         self.play = play_handle
         self.model_dir = model_dir
         self.train = train
+        self.use_wandb = use_wandb
 
         if self.train:
             self.summary = SummaryObj(log_name=log_name, log_dir=log_dir)
@@ -386,8 +387,9 @@ class Runner(object):
 
         if self.train:
             print('\n[INFO] {}'.format(info))
-            import wandb
-            wandb.log({'R/pred': info['predator']['mean_reward'],'R/prey': info['prey']['mean_reward']})
+            if self.use_wandb:
+                import wandb
+                wandb.log({'R/pred': info['predator']['mean_reward'],'R/prey': info['prey']['mean_reward']})
             if self.save_every and (iteration + 1) % self.save_every == 0:
                 print(Color.INFO.format('[INFO] Saving model ...'))
                 self.models[0].save(self.model_dir + '-predator', iteration)

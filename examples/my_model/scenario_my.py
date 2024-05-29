@@ -110,7 +110,7 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
             # if 'me' in models[i].name:
             #     former_g[i] = np.tile(former_g[i], (max_nums[i], 1))
             former_act_prob[i] = np.tile(former_act_prob[i], (max_nums[i], 1))
-            acts[i], _ = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)
+            acts[i], _, logprobs[i] = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)
             # acts[i], _, logprobs[i] = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)   # Continuous Action space
 
         old_obs = obs
@@ -135,9 +135,9 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         #     predator_buffer['g'] = former_g[0]
         # if 'mf' in models[0].name or 'ma' in models[0].name:
         #     predator_buffer['meanaction'] = former_meanaction[0]
+        predator_buffer['prob'] = former_act_prob[0]
         if 'sac' in models[0].name:
             predator_buffer['next_state'] = obs[0]
-        predator_buffer['prob'] = former_act_prob[0]
 
         prey_buffer = {
             'state': old_obs[1], 
@@ -152,9 +152,9 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         #     prey_buffer['g'] = former_g[1]
         # if 'mf' in models[1].name or 'ma' in models[1].name:
         #     prey_buffer['meanaction'] = former_meanaction[1]
+        prey_buffer['prob'] = former_act_prob[1]
         if 'sac' in models[1].name:
             prey_buffer['next_state'] = obs[1]
-        prey_buffer['prob'] = former_act_prob[1]
 
         models[0].flush_buffer(**predator_buffer)
         models[1].flush_buffer(**prey_buffer)

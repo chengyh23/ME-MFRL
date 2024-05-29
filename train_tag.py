@@ -66,11 +66,13 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0, help='setup random seed')
     parser.add_argument('--order', type=int, default=4, help='moment order')
     parser.add_argument('--name', type=str, help='name of WandB file', required=False)
+    parser.add_argument('--use_wandb', type=bool, default=False, help='log onto wandb or not')
 
     args = parser.parse_args()
 
-    import wandb
-    wdb = wandb.init(project="MF-PE", resume="allow", name=f"tag/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
+    if args.use_wandb:
+        import wandb
+        wdb = wandb.init(project="MF-PE", resume="allow", name=f"tag/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
     
     setup_seed(seed=args.seed)
     # Initialize the environment
