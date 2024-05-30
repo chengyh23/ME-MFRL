@@ -31,7 +31,7 @@ class DQN(base.ValueNet):
         for i in range(batch_num):
             obs, obs_next, dones, rewards, actions, masks = self.replay_buffer.sample()
             target_q = self.calc_target_q(obs=obs_next, rewards=rewards, dones=dones)
-            loss, q = super().train(state=obs, target_q=target_q, acts=actions, masks=masks)
+            loss, q = super().train(obs=obs, target_q=target_q, acts=actions, masks=masks)
 
             self.update()
 
@@ -70,7 +70,7 @@ class MFQ(base.ValueNet):
         }
 
         self.train_ct = 0
-        self.replay_buffer = tools.MemoryGroup(**config)
+        self.replay_buffer = tools.MemoryGroup(**config, use_mean=True)
         self.update_every = update_every
 
     def flush_buffer(self, **kwargs):

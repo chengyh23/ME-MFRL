@@ -167,13 +167,15 @@ class AgentMemory(object):
         return res
 
 class MemoryGroup(object):
-    def __init__(self, obs_shape, act_n, max_len, batch_size, sub_len, act_dim=1):
+    def __init__(self, obs_shape, act_n, max_len, batch_size, sub_len, act_dim=1, use_mean=False):
         self.agent = dict()
         self.max_len = max_len
         self.batch_size = batch_size
         self.obs_shape = obs_shape
         self.sub_len = sub_len
         self.act_n = act_n
+        
+        self.use_mean=use_mean
 
         self.state = MetaBuffer(obs_shape, max_len)
         self.actions = MetaBuffer((), max_len, dtype='int32')
@@ -214,7 +216,10 @@ class MemoryGroup(object):
         """_summary_
 
         Returns:
-            obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
+            If not use mean: 
+                obs, obs_next, dones, rewards, actions, masks
+            If use mean: 
+                obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
             _type_: _description_
         """
         idx = np.random.choice(self.nb_entries, size=self.batch_size)
@@ -227,13 +232,14 @@ class MemoryGroup(object):
         dones = self.terminals.sample(idx)
         masks = self.masks.sample(idx)
 
-        # if self.use_mean:
-        act_prob = self.prob.sample(idx)
-        act_next_prob = self.prob.sample(next_idx)
-        return obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
-        # else:
-        #     return obs, obs_next, dones, rewards, actions, masks
-
+        if self.use_mean:
+            act_prob = self.prob.sample(idx)
+            act_next_prob = self.prob.sample(next_idx)
+            return obs, actions, act_prob, obs_next, act_next_prob, rewards, dones, masks
+        else:
+            return obs, obs_next, dones, rewards, actions, masks
+        return obs, obs_next, dones, rewards, actions, masks
+    
     def get_batch_num(self):
         print('\n[INFO] Length of buffer and new add:', len(self.state), self._new_add)
         res = self._new_add * 2 // self.batch_size

@@ -164,7 +164,7 @@ class ValueNet:
 
     def train(self, **kwargs):
         """Train the model
-        kwargs: {'obs', 'target_q', 'prob', 'acts'}
+        kwargs: {'obs', 'target_q', 'prob' (optional), 'acts'}
         """
         feed_dict = {
             self.feat_input: kwargs['obs'],

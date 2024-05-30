@@ -74,7 +74,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.use_wandb:
         import wandb
-        wdb = wandb.init(project="MF-PE", resume="allow", name=f"myv5/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
+        wdb = wandb.init(project="MF-PE", resume="allow", name=f"my/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
 
     # set_seed(args.seed)
     # Initialize the environment    
