@@ -192,6 +192,32 @@ class MultiAgentEnv(gym.Env):
         # make sure we used all elements of action
         assert len(action) == 0
 
+    # get action, but do NOT set for agents
+    def _get_action(self, action, action_space, time=None):
+        # Author: Yuhan
+        
+        # process action
+        if isinstance(action_space, MultiDiscrete):
+            act = []
+            size = action_space.high - action_space.low + 1
+            index = 0
+            for s in size:
+                act.append(action[index:(index+s)])
+                index += s
+            action = act
+        else:
+            action = [action]
+            
+        if self.discrete_action_input:
+            ret = np.zeros(self.world.dim_p)
+            # process discrete action
+            if action[0] == 1: ret[0] = -1.0
+            if action[0] == 2: ret[0] = +1.0
+            if action[0] == 3: ret[1] = -1.0
+            if action[0] == 4: ret[1] = +1.0
+            return ret
+        else:
+             raise NotImplementedError   
     # reset rendering assets
     def _reset_render(self):
         self.render_geoms = None

@@ -74,11 +74,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.use_wandb:
         import wandb
-        wdb = wandb.init(project="MF-PE", resume="allow", name=f"my/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
+        wdb = wandb.init(project="MF-PE", resume="allow", name=f"kf/{args.algo}_{args.n_round}x{args.max_steps}/{args.seed}")
 
     # set_seed(args.seed)
     # Initialize the environment    
-    env = make_env('exp_tag',discrete_action_space=True, discrete_action_input=True)
+    # env = make_env('exp_tag',discrete_action_space=True, discrete_action_input=True)
+    env = make_env('expkf_tag',discrete_action_space=True, discrete_action_input=True, benchmark=True)
     # handles = env.get_handles()   # 'MultiAgentEnv' object has no attribute 'get_handles'
 
     tf_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)

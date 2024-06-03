@@ -153,9 +153,39 @@ class ValueNet:
         pi = self.sess.run(self.predict, feed_dict=feed_dict)
 
         if kwargs['train']:
+            kf_act = True
+            if kf_act:
+                logdet = lambda matrix: np.linalg.slogdet(matrix)
+                sigmoid = lambda x: 1 / (1 + np.exp(-x))
+                Uc = 0.0
+                for agent in self.env.agents:
+                    sign, ld = logdet(agent.kf.Q)
+                    Uc += ld
             # decay epsilon-greedy
+            remained_p = 1 - max(0, 0.2 * kwargs['eps'] - 0.15)
             if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
                 actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)
+            # >>>>>>>>>>>>>>> KF-guided Action selection >>>>>>>>>>>>>>>>>>
+            elif kf_act and np.random.rand() < sigmoid(-Uc)*0.4 * remained_p:   # TODO tune the map from Uc to epsilon2
+                group_pred = [a for a in self.env.agents if a.adversary]
+                group_prey = [a for a in self.env.agents if not a.adversary]
+                allies = group_pred if 'predator' in self.name else group_prey
+                opponents = group_prey if 'predator' in self.name else group_pred
+                actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)  # initilization
+                # select action for each of our allies
+                for i,agent in enumerate(allies):
+                    # The nearest opponent
+                    dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - opnt.state.p_pos))) for opnt in opponents]
+                    _idx = np.argmin(dists)
+                    # Approach (pred) / Leave (prey) the nearest opponent
+                    # TODO In world, updating agents' states is not so simple
+                    new_pos_candidates = [
+                        agent.state.p_pos + self.env._get_action(act, self.env.action_space) * self.env.world.dt \
+                            for act in range(self.env.action_space[i].n)]
+                    dists = [np.sqrt(np.sum(np.square(new_pos - opponents[_idx].state.p_pos))) for new_pos in new_pos_candidates]
+                    actions[i] = np.argmin(dists) if agent.adversary else np.argmax(dists)
+                # print('[haha] KF-guided action selection')
+            # <<<<<<<<<<<<<<< KF-guided Action selection <<<<<<<<<<<<<<<<<<
             else:
                 actions = np.argmax(pi, axis=1).astype(np.int32)
         else:

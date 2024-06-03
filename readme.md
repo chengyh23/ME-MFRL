@@ -12,6 +12,10 @@ pip install magent
 cd env/mpe
 pip install -e .
 ```
+Alternatively,
+```shell
+export PYTHONPATH="/home/chengyh23/Documents/ME-MFRL/env/mpe:$PYTHONPATH"
+```
 
 # Scripts
 ## train in my
