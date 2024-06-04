@@ -3,7 +3,8 @@ ablations/
 utils/
 wandb/
 .vscode/
-*.sh
+.tmp/
+# *.sh
 *.png
 common/*.png
 common/*.csv

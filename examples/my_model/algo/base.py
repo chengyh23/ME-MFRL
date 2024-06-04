@@ -13,7 +13,7 @@ class Color:
     ERROR = '\033[1;31m{}\033[0m'
 
 class ValueNet:
-    def __init__(self, sess, name, handle, env, update_every=5, use_mf=False, attention=False, learning_rate=1e-4, tau=0.005, gamma=0.95):
+    def __init__(self, sess, name, handle, env, update_every=5, use_mf=False, use_kf_act=False, attention=False, learning_rate=1e-4, tau=0.005, gamma=0.95):
         # assert isinstance(env, GridWorld)
         self.env = env
         self.name = name
@@ -25,6 +25,7 @@ class ValueNet:
 
         self.update_every = update_every
         self.use_mf = use_mf  # trigger of using mean field
+        self.use_kf_act = use_kf_act
         self.attention = attention  # trigger of using attention mechanism
         self.temperature = 0.1
 
@@ -134,6 +135,30 @@ class ValueNet:
         """Q-learning update"""
         self.sess.run(self.update_op)
 
+    def _kf_guided_act(self):
+        """KF-guided Action selection"""
+        group_pred = [a for a in self.env.agents if a.adversary]
+        group_prey = [a for a in self.env.agents if not a.adversary]
+        allies = group_pred if 'predator' in self.name else group_prey
+        opponents = group_prey if 'predator' in self.name else group_pred
+        # pi.shape[0] == len(allies)
+        actions = np.random.randint(0, self.num_actions, size=len(allies), dtype=np.int32)  # initilization
+        # actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)  # initilization
+        # select action for each of our allies
+        for i,agent in enumerate(allies):
+            # The nearest opponent
+            dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - opnt.state.p_pos))) for opnt in opponents]
+            _idx = np.argmin(dists)
+            # Approach (pred) / Leave (prey) the nearest opponent
+            # TODO In world, updating agents' states is not so simple
+            new_pos_candidates = [
+                agent.state.p_pos + self.env._get_action(act, self.env.action_space) * self.env.world.dt \
+                    for act in range(self.env.action_space[i].n)]
+            dists = [np.sqrt(np.sum(np.square(new_pos - opponents[_idx].state.p_pos))) for new_pos in new_pos_candidates]
+            actions[i] = np.argmin(dists) if agent.adversary else np.argmax(dists)
+        # print('[haha] KF-guided action selection')
+        return actions
+    
     def act(self, **kwargs):
         """Act
         kwargs: {'obs', 'prob', 'eps'}
@@ -153,40 +178,32 @@ class ValueNet:
         pi = self.sess.run(self.predict, feed_dict=feed_dict)
 
         if kwargs['train']:
-            kf_act = True
-            if kf_act:
+            # kf_act = True
+            if self.use_kf_act:
                 logdet = lambda matrix: np.linalg.slogdet(matrix)
                 sigmoid = lambda x: 1 / (1 + np.exp(-x))
                 Uc = 0.0
                 for agent in self.env.agents:
                     sign, ld = logdet(agent.kf.Q)
                     Uc += ld
-            # decay epsilon-greedy
-            remained_p = 1 - max(0, 0.2 * kwargs['eps'] - 0.15)
-            if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
-                actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)
-            # >>>>>>>>>>>>>>> KF-guided Action selection >>>>>>>>>>>>>>>>>>
-            elif kf_act and np.random.rand() < sigmoid(-Uc)*0.4 * remained_p:   # TODO tune the map from Uc to epsilon2
-                group_pred = [a for a in self.env.agents if a.adversary]
-                group_prey = [a for a in self.env.agents if not a.adversary]
-                allies = group_pred if 'predator' in self.name else group_prey
-                opponents = group_prey if 'predator' in self.name else group_pred
-                actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)  # initilization
-                # select action for each of our allies
-                for i,agent in enumerate(allies):
-                    # The nearest opponent
-                    dists = [np.sqrt(np.sum(np.square(agent.state.p_pos - opnt.state.p_pos))) for opnt in opponents]
-                    _idx = np.argmin(dists)
-                    # Approach (pred) / Leave (prey) the nearest opponent
-                    # TODO In world, updating agents' states is not so simple
-                    new_pos_candidates = [
-                        agent.state.p_pos + self.env._get_action(act, self.env.action_space) * self.env.world.dt \
-                            for act in range(self.env.action_space[i].n)]
-                    dists = [np.sqrt(np.sum(np.square(new_pos - opponents[_idx].state.p_pos))) for new_pos in new_pos_candidates]
-                    actions[i] = np.argmin(dists) if agent.adversary else np.argmax(dists)
-                # print('[haha] KF-guided action selection')
-            # <<<<<<<<<<<<<<< KF-guided Action selection <<<<<<<<<<<<<<<<<<
-            else:
+            # # decay epsilon-greedy
+            # remained_p = 1 - max(0, 0.2 * kwargs['eps'] - 0.15)
+            # if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:
+            #     actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)
+            # elif self.use_kf_act and np.random.rand() < sigmoid(-Uc)*0.4 * remained_p:   # TODO tune the map from Uc to epsilon2
+            #     actions = self._kf_guided_act()
+            # else:
+            #     actions = np.argmax(pi, axis=1).astype(np.int32)
+                
+            if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:   # exploration
+                # print('wow! exploring~', end=' ')
+                if self.use_kf_act and np.random.rand() < sigmoid(-Uc)*0.5:  # KF-guided exploration
+                    # print('KF guided', Uc)
+                    actions = self._kf_guided_act()
+                else:   # random exploration
+                    # print('randomly')
+                    actions = np.random.randint(0, self.num_actions, size=pi.shape[0], dtype=np.int32)
+            else:   # exploitation
                 actions = np.argmax(pi, axis=1).astype(np.int32)
         else:
             actions = np.argmax(pi, axis=1).astype(np.int32)

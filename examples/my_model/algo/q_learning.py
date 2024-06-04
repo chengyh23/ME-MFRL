@@ -14,9 +14,9 @@ class Color:
     ERROR = '\033[1;31m{}\033[0m'
 
 class DQN(base.ValueNet):
-    def __init__(self, sess, name, handle, env, sub_len, memory_size=2**10, batch_size=64, update_every=5):
+    def __init__(self, sess, name, handle, env, sub_len, memory_size=2**10, batch_size=64, update_every=5, use_kf_act=False):
 
-        super().__init__(sess, name, handle, env, update_every=update_every)
+        super().__init__(sess, name, handle, env, update_every=update_every, use_kf_act=use_kf_act)
 
         self.replay_buffer = tools.MemoryGroup(self.feature_space, self.num_actions, memory_size, batch_size, sub_len)
         self.sess.run(tf.global_variables_initializer())

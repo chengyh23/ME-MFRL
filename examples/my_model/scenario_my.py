@@ -57,9 +57,46 @@ def _cal_ca(a, order=4):
     c_a = np.array(c_a).T
     return c_a.reshape(1,-1)
 
+def kf_step(env,all_info):
+    # kf_system.predict()
+    for agent in env.agents:
+        agent.kf.predict()
+        # Update kf using measurements from all observers of an agent
+        for i, z in enumerate(all_info['n'][agent.id]):    # relative measurements from opponents
+            # pos_rel = z[:2]
+            # vel = z[2:]
+            # observer_state = agent.kf.x[:2]
+            observer_idx = (i + num_pred) if agent.adversary else i
+            observer_pos = env.agents[observer_idx].state.p_pos
+            # pos_absolute = pos_rel + observer_pos
+            z[:2] += observer_pos
+            agent.kf.update(z)
+    belief = []
+    # Calc estimation error
+    errors = 0.0
+    # errors_vel = 0.0
+    for agent in env.agents:
+        belief.append(agent.kf.x)
+        error = np.sqrt(np.sum((agent.state.p_pos - agent.kf.x[:2])**2))
+        errors += error
+        # error_vel = np.sqrt(np.sum((agent.state.p_vel - agent.kf.x[2:])**2))
+        # errors_vel += error_vel
+    # print(belief)
+    # print(errors)
+    # print(errors, errors_vel)
+    
+    
+    # # Uncertainty (Covariance)
+    # all_cov = []
+    # for agent in env.agents:
+    #     all_cov.append(np.diag(agent.kf.Q))
+    # pred_cov = np.concatenate(all_cov[:num_pred])
+    # prey_cov = np.concatenate(all_cov[num_pred:])
+    # # each agent use cov of its opponent agents
+    # cov = [np.tile(prey_cov, (num_pred,1)), np.tile(pred_cov, (num_prey,1))]
+            
 
-
-def play(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, eps=None, train=False):
+def play(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, eps=None, train=False, use_kf_act=False):
     env.reset()
 
     step_ct = 0
@@ -135,35 +172,8 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         
         # >>>>>>>>>>>>> Kalman Filter >>>>>>>>>>>>>>>>
         # print(all_info)
-        # kf_system.predict()
-        for agent in env.agents:
-            agent.kf.predict()
-            # Update kf using measurements from all observers of an agent
-            for i, z_rel in enumerate(all_info['n'][agent.id]):    # relative measurements from opponents
-                # observer_state = agent.kf.x[:2]
-                observer_idx = (i + num_pred) if agent.adversary else i
-                observer_state = env.agents[observer_idx].state.p_pos
-                absolute_z = z_rel + observer_state
-                agent.kf.update(absolute_z)
-        belief = []
-        # Calc estimation error
-        errors = 0.0
-        for agent in env.agents:
-            belief.append(agent.kf.x)
-            error = np.sqrt(np.sum((agent.state.p_pos - agent.kf.x)**2))
-            errors += error
-        # print(belief)
-        # print(errors)
-        
-        # # Uncertainty (Covariance)
-        # all_cov = []
-        # for agent in env.agents:
-        #     all_cov.append(np.diag(agent.kf.Q))
-        # pred_cov = np.concatenate(all_cov[:num_pred])
-        # prey_cov = np.concatenate(all_cov[num_pred:])
-        # # each agent use cov of its opponent agents
-        # cov = [np.tile(prey_cov, (num_pred,1)), np.tile(pred_cov, (num_prey,1))]
-                
+        if use_kf_act:
+            kf_step(env, all_info)
         # <<<<<<<<<<<<< Kalman Filter <<<<<<<<<<<<<<<<        
         
         predator_buffer = {

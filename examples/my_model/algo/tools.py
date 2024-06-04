@@ -314,7 +314,7 @@ class SummaryObj:
 
 class Runner(object):
     def __init__(self, sess, env, handles, map_size, max_steps, models,
-                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, train=False, use_moment=True, use_wandb=False):
+                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, train=False, use_moment=True, use_kf_act=False, use_wandb=False):
         """Initialize runner
 
         Parameters
@@ -356,6 +356,7 @@ class Runner(object):
         self.play = play_handle
         self.model_dir = model_dir
         self.train = train
+        self.use_kf_act = use_kf_act
         self.use_wandb = use_wandb
 
         if self.train:
@@ -381,7 +382,7 @@ class Runner(object):
         if render:
             print(f'Render @iter{iteration}')
         mean_rewards = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,
-                    models=self.models, print_every=50, eps=variant_eps, render=render, train=self.train)
+                    models=self.models, print_every=50, eps=variant_eps, render=render, train=self.train, use_kf_act=self.use_kf_act)
 
         for i, tag in enumerate(['predator', 'prey']):
             info[tag]['mean_reward'] = mean_rewards[i]

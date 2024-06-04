@@ -16,7 +16,9 @@ import time
 import numpy as np
 
 
-def make_env(scenario_name, benchmark=False, discrete_action_space=False, discrete_action_input=False):
+def make_env(scenario_name, num_adversaries=30, num_good_agents=10, \
+    noisy_obs=False, use_kf_act=False, kf_proc_model=None,\
+    benchmark=False, discrete_action_space=False, discrete_action_input=False):
     '''
     Creates a MultiAgentEnv object as env. This can be used similar to a gym
     environment by calling env.reset() and env.step().
@@ -39,7 +41,7 @@ def make_env(scenario_name, benchmark=False, discrete_action_space=False, discre
     # load scenario from script
     scenario = scenarios.load(scenario_name + ".py").Scenario()
     # create world
-    world = scenario.make_world()
+    world = scenario.make_world(num_adversaries, num_good_agents, noisy_obs, use_kf_act, kf_proc_model)
     # create multiagent environment
     if benchmark:        
         env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, 
