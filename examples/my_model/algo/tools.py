@@ -378,7 +378,7 @@ class Runner(object):
                 'prey': {'mean_reward': 0.}}
 
         render = (iteration + 1) % self.render_every == 0 if self.render_every > 0 else False
-        render = render and not self.train
+        # render = render and not self.train    # only render when testing
         if render:
             print(f'Render @iter{iteration}')
         mean_rewards = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,

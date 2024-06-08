@@ -15,7 +15,7 @@ import numpy as np
 import magent
 from examples.my_model.algo import spawn_ai
 from examples.my_model.algo import tools
-from examples.my_model.scenario_my import play
+from examples.my_model.scenario_my1 import play
 
 from env.mpe.make_env import make_env
 
@@ -69,8 +69,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int, default=400, help='set the max steps')
     parser.add_argument('--seed', type=int, default=1, help='random seed')
     parser.add_argument('--order', type=int, default=4, help='moment order')
-    parser.add_argument('--num_adversaries', type=int, default=30, help='number of predators')
-    parser.add_argument('--num_good_agents', type=int, default=10, help='number of preys')
+    parser.add_argument('--num_adversaries', type=int, default=3, help='number of predators')
+    parser.add_argument('--num_good_agents', type=int, default=2, help='number of preys')
     parser.add_argument('--noisy_obs', action='store_true', help='add noise to observation')   # 
     parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
     parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
@@ -79,12 +79,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.use_wandb:
         import wandb
-        _name = ""
+        # _name = ""
         
-        # _name += "noiobs_" if args.noisy_obs else "accobs_"
-        _name += f"kfact_{args.kf_proc_model}" if args.use_kf_act else "epsgr"
+        _name = "se"    # silly evader (fixed behavior)
+        _name += "/no" if args.noisy_obs else "/ao" # noiobs OR accobs
+        _name += f"/ka_{args.kf_proc_model}" if args.use_kf_act else "/eg"    # kfact OR epsgr
         _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
-        
         # if args.use_kf_act:
         #     _name = f"kfv4_{args.kf_proc_model}/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
         # else:
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     # Initialize the environment    
     # env = make_env('exp_tag')
     # scenario_name = 'exppf_tag' if args.use_kf_act else 'exp_tag'
-    env = make_env('exp_tag',num_adversaries=args.num_adversaries, num_good_agents=args.num_good_agents, \
+    env = make_env('exp_tag1',num_adversaries=args.num_adversaries, num_good_agents=args.num_good_agents, \
         noisy_obs=args.noisy_obs, use_kf_act=args.use_kf_act, kf_proc_model=args.kf_proc_model, \
         discrete_action_space=True, discrete_action_input=True, benchmark=True)
     # handles = env.get_handles()   # 'MultiAgentEnv' object has no attribute 'get_handles'

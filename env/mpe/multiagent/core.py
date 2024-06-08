@@ -77,7 +77,112 @@ class Agent(Entity):
         self.action = Action()
         # script behavior to execute
         self.action_callback = None
+class Evader(Agent):
+    def __init__(self):
+        super(Evader, self).__init__()
+        # change value of variable in the parent class
+        self.collide = False
+        
+        # new variable members
+        self.direction = 2  # initilization
+        # consistent with _set_action() in MultiAgentEnv
+            # 0: (0, 0)
+            # 1: (-1, 0)
+            # 2: (+1, 0)
+            # 3: (0, -1)
+            # 4: (0, +1)
+        # Rectangular path
+        self.x1 = -1 + 0.2
+        self.x2 = +1 - 0.2
+        self.y1 = -1 + 0.2
+        self.y2 = +1 - 0.2
+        # self.step = 0.05    # TODO keep conssitent with mpe
+    def sample_point_on_path(self):
+        # Lengths of each side of the rectangle
+        length_down = self.x2 - self.x1
+        length_right = self.y2 - self.y1
+        length_up = self.x1 - self.x2  # Negative because moving left
+        length_left = self.y1 - self.y2    # Negative because moving up
 
+        total_length = (length_right + length_down)*2
+        _p = np.random.uniform(0, total_length)
+
+        # Determine which side the point falls on
+        distance_traveled = 0
+        if _p < length_right:
+            # On the right side
+            x = self.x2
+            y = self.y1 + (_p - distance_traveled)
+        elif _p < length_right + length_down:
+            # On the down side
+            distance_traveled += length_right
+            x = self.x2 - (_p - distance_traveled)
+            y = self.y2
+        elif _p < length_right + length_down + length_left:
+            # On the left side
+            distance_traveled += length_right + length_down
+            x = self.x1
+            y = self.y2 - (_p - distance_traveled)
+        else:
+            # On the up side
+            distance_traveled += length_right + length_down + length_left
+            x = self.x1 + (_p - distance_traveled)
+            y = self.y1
+
+        return (x, y)
+    
+    def _update(self):
+        # called by world.step()
+        # rect_dirs = ['right', 'down', 'left', 'up']
+        #               2 ----> 4 ----> 1 ----> 3
+        _pos = self.state.p_pos
+        if self.direction == 2:
+            if _pos[0] >= self.x2:
+                self.direction = 4
+        elif self.direction == 4:
+            if _pos[1] >= self.y2:
+                self.direction = 1
+        elif self.direction == 1:
+            if _pos[0] <= self.x1:
+                self.direction = 3
+        elif self.direction == 3:
+            if _pos[1] <= self.y1:
+                self.direction = 2
+        else:
+            raise ValueError("Invalid evader direction")
+    def _get_act(self):
+        # consistent with _set_action() in MultiAgentEnv
+            # 0: (0, 0)
+            # 1: (-1, 0)
+            # 2: (+1, 0)
+            # 3: (0, -1)
+            # 4: (0, +1)
+        action = self.direction   # 大方向
+        thr = 0.1
+        if self.direction == 2:
+            if self.state.p_pos[1] < self.y1 - thr:
+                action = 4
+            if self.state.p_pos[1] > self.y1 + thr:
+                action = 3
+        elif self.direction == 4:
+            if self.state.p_pos[0] < self.x2 - thr:
+                action = 2
+            if self.state.p_pos[0] > self.x2 + thr:
+                action = 1
+        elif self.direction == 1:
+            if self.state.p_pos[1] < self.y2 - thr:
+                action = 4
+            if self.state.p_pos[1] > self.y2 + thr:
+                action = 3
+        elif self.direction == 3:
+            if self.state.p_pos[0] < self.x1 - thr:
+                action = 2
+            if self.state.p_pos[0] > self.x1 + thr:
+                action = 1
+        # print(self.state.p_pos)
+        # print(self.direction, action)
+        return action
+    
 # multi-agent world
 class World(object):
     def __init__(self):
@@ -129,6 +234,10 @@ class World(object):
         # update agent state
         for agent in self.agents:
             self.update_agent_state(agent)
+            
+        for agent in self.agents:
+            if isinstance(agent, Evader):
+                agent._update()
 
     # gather agent action forces
     def apply_action_force(self, p_force):
@@ -146,6 +255,7 @@ class World(object):
             for b,entity_b in enumerate(self.entities):
                 if(b <= a): continue
                 [f_a, f_b] = self.get_collision_force(entity_a, entity_b)
+                # print(a,b,'     ',f_a, f_b)
                 if(f_a is not None):
                     if(p_force[a] is None): p_force[a] = 0.0
                     p_force[a] = f_a + p_force[a] 
