@@ -2,6 +2,7 @@
 Multi-agent particle environment, spread task. Test.
 
 ```shell
+python test_my.py --pred dqn --idx 449 --use_kf_act
 python test_my.py --pred ppo --prey ppo --idx  1999 1999
 python test_my.py --pred ppo --prey ppo --path data/models/ppo_1-predator data/models/ppo_1-prey --idx  449 449
 ```
@@ -27,16 +28,18 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "4"
 
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# BASE_DIR = '/home/chengyh23/Documents/.tmp/ME-MFRL.0FZRRP'
+BASE_DIR = '/home/chengyh23/Documents/ME-MFRL'
 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pred', type=str, choices={'ac','ppo', 'mfac', 'mfppo', 'mfac_bin', 'mfppo_bin', 'sac', 'me_mfppo'}, help='choose an algorithm from the preset', required=True)
-    parser.add_argument('--prey', type=str, choices={'ac','ppo', 'mfppo', 'mfppo_bin', 'sac', 'me_mfppo'}, help='indicate the opponent model')
-    parser.add_argument('--seed', type=int, default=1, help='random seed')
+    parser.add_argument('--pred', type=str, choices={'dqn', 'ac','ppo', 'mfac', 'mfppo', 'mfac_bin', 'mfppo_bin', 'sac', 'me_mfppo'}, help='choose an algorithm from the preset', required=True)
+    parser.add_argument('--smart_prey', action='store_true', help='model for prey')
+    # parser.add_argument('--prey', type=str, choices={'ac','ppo', 'mfppo', 'mfppo_bin', 'sac', 'me_mfppo'}, help='indicate the opponent model')
+    parser.add_argument('--seed', type=int, default=3, help='random seed')
     parser.add_argument('--pred_dir', type=str, help='the path of the algorithm')
-    parser.add_argument('--prey_dir', type=str, help='the path of the opponent model')
+    # parser.add_argument('--prey_dir', type=str, help='the path of the opponent model')
     parser.add_argument('--n_round', type=int, default=100, help='set the trainning round')
     parser.add_argument('--render', action='store_true', help='render or not (if true, will render every save)')
     parser.add_argument('--map_size', type=int, default=40, help='set the size of map')  # then the amount of agents is 64
@@ -44,7 +47,9 @@ if __name__ == '__main__':
     # parser.add_argument('--path', nargs='*', default=['', ''], help='model path', required=True)
     parser.add_argument('--order', nargs='*', default=[4, 4], help='moment order')
     parser.add_argument('--idx', nargs='*', required=True)
-
+    parser.add_argument('--noisy_obs', action='store_true', help='add noise to observation')   # 
+    parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
+    parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
     args = parser.parse_args()
 
     # Initialize the environment
@@ -53,20 +58,24 @@ if __name__ == '__main__':
     tf_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
     tf_config.gpu_options.allow_growth = True
 
+    _name = "se-no-ka_cv-dqn_500x400-30v10-7"
     # predator_model_dir = os.path.join(BASE_DIR, 'data/models/{}-predator'.format(args.pred))
     # prey_model_dir = os.path.join(BASE_DIR, 'data/models/{}-prey'.format(args.prey))
-    predator_model_dir = os.path.join(BASE_DIR, 'data/models/{}_{}'.format(args.pred, args.seed))
-    prey_model_dir = os.path.join(BASE_DIR, 'data/models/{}_{}'.format(args.prey, args.seed))
+    predator_model_dir = os.path.join(BASE_DIR, 'data/models/{}'.format(_name))
+    if args.smart_prey:
+        prey_model_dir = os.path.join(BASE_DIR, 'data/models/{}_{}'.format(args.prey, args.seed))
     
     sess = tf.Session(config=tf_config)
-    models = [spawn_ai(args.pred, sess, env, None, args.pred + '-predator', args.max_steps, args.order[0]),
-              spawn_ai(args.prey, sess, env, None, args.prey + '-prey', args.max_steps, args.order[1])]
+    models = [spawn_ai(args.pred, sess, env, None, args.pred + '-predator', args.max_steps, args.use_kf_act, args.order[0]),
+            #   spawn_ai(args.prey, sess, env, None, args.prey + '-prey', args.max_steps, args.order[1])]
+              None]
     sess.run(tf.global_variables_initializer())
 
     # models[0].load(args.path[0], step=args.idx[0])
     # models[1].load(args.path[1], step=args.idx[1])
     models[0].load(predator_model_dir + '-predator', step=args.idx[0])
-    models[1].load(prey_model_dir + '-prey', step=args.idx[1])
+    if args.smart_prey:
+        models[1].load(prey_model_dir + '-prey', step=args.idx[1])
 
     runner = tools.Runner(sess, env, None, args.map_size, args.max_steps, models, test, render_every=10)
     reward_ls = {'predator': [], 'prey': []}

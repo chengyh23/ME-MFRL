@@ -314,7 +314,7 @@ class SummaryObj:
 
 class Runner(object):
     def __init__(self, sess, env, handles, map_size, max_steps, models,
-                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, train=False, use_moment=True, use_kf_act=False, use_wandb=False):
+                play_handle, render_every=None, save_every=None, tau=None, log_name=None, log_dir=None, model_dir=None, render_dir=None, train=False, use_moment=True, use_kf_act=False, use_wandb=False):
         """Initialize runner
 
         Parameters
@@ -355,6 +355,7 @@ class Runner(object):
         self.save_every = save_every
         self.play = play_handle
         self.model_dir = model_dir
+        self.render_dir = render_dir
         self.train = train
         self.use_kf_act = use_kf_act
         self.use_wandb = use_wandb
@@ -382,7 +383,7 @@ class Runner(object):
         if render:
             print(f'Render @iter{iteration}')
         mean_rewards = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,
-                    models=self.models, print_every=50, eps=variant_eps, render=render, train=self.train, use_kf_act=self.use_kf_act)
+                    models=self.models, print_every=50, eps=variant_eps, render=render, render_dir=self.render_dir, train=self.train, use_kf_act=self.use_kf_act)
 
         for i, tag in enumerate(['predator', 'prey']):
             info[tag]['mean_reward'] = mean_rewards[i]
@@ -400,7 +401,7 @@ class Runner(object):
             if self.save_every and (iteration + 1) % self.save_every == 0:
                 print(Color.INFO.format('[INFO] Saving model ...'))
                 self.models[0].save(self.model_dir + '-predator', iteration)
-                self.models[1].save(self.model_dir + '-prey', iteration)
+                # self.models[1].save(self.model_dir + '-prey', iteration)
         else:
             mean_reward['predator'].append(info['predator']['mean_reward'])
             mean_reward['prey'].append(info['prey']['mean_reward'])

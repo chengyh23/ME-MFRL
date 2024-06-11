@@ -95,8 +95,13 @@ def kf_step(env,all_info):
     # # each agent use cov of its opponent agents
     # cov = [np.tile(prey_cov, (num_pred,1)), np.tile(pred_cov, (num_prey,1))]
     
+def _get_act_preys(evaders):
+    actions = np.zeros(len(evaders), dtype=np.int32)
+    for i,evader in enumerate(evaders):
+        actions[i] = evader._get_act()
+    return actions
 
-def play(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, eps=None, train=False, use_kf_act=False):
+def play(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, render_dir=None, eps=None, train=False, use_kf_act=False):
     env.reset()
 
     step_ct = 0
@@ -151,26 +156,21 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         #################
         # print('\n===============obs len: ', len(obs))
         
-        # >>>>> Pred acts by RL model
-        # if 'mf' in models[i].name:
-        #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
-        # if 'ma' in models[i].name:
-        #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
-        # if 'me' in models[i].name:
-        #     former_g[i] = np.tile(former_g[i], (max_nums[i], 1))
-        former_act_prob[0] = np.tile(former_act_prob[0], (max_nums[0], 1))
-        # kf_cov[i] = env.world.good_agents()
-        acts[0], _, logprobs[0] = models[0].act(obs=obs[0], prob=former_act_prob[0], eps=eps, train=True)   # TODO only mean-field of allies? not considering that of opponents?
-        # acts[i], _, logprobs[i] = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)   # Continuous Action space
-        
-        def _get_act_preys(evaders):
-            actions = np.zeros(len(evaders), dtype=np.int32)
-            for i,evader in enumerate(evaders):
-                actions[i] = evader._get_act()
-            return actions
-        preys = [agent for agent in env.agents if agent.adversary==False]
-        acts[1] = _get_act_preys(preys)
-        # Prey acts following fixed paths <<<<<
+        for i in range(n_group):
+            if i==0:    # pred acts by RL model
+                # if 'mf' in models[i].name:
+                #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
+                # if 'ma' in models[i].name:
+                #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
+                # if 'me' in models[i].name:
+                #     former_g[i] = np.tile(former_g[i], (max_nums[i], 1))
+                former_act_prob[0] = np.tile(former_act_prob[0], (max_nums[0], 1))
+                # kf_cov[i] = env.world.good_agents()
+                acts[0], _, logprobs[0] = models[0].act(obs=obs[0], prob=former_act_prob[0], eps=eps, train=True)   # TODO only mean-field of allies? not considering that of opponents?
+                # acts[i], _, logprobs[i] = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)   # Continuous Action space
+            elif i==1:  # prey acts following fixed paths
+                preys = [agent for agent in env.agents if agent.adversary==False]
+                acts[1] = _get_act_preys(preys)
         
         old_obs = obs
         stack_act = np.concatenate(acts, axis=0)
@@ -178,7 +178,9 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         obs = [all_obs[:num_pred], all_obs[num_pred:]]
         rewards = [all_rewards[:num_pred], all_rewards[num_pred:]]
         done = all(all_done)
-
+        if train==False:
+            if done:
+                raise Exception
         stack_act = [stack_act[:num_pred], stack_act[num_pred:]]
         
         # >>>>>>>>>>>>> Kalman Filter >>>>>>>>>>>>>>>>
@@ -186,43 +188,43 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         if use_kf_act:
             kf_step(env, all_info)
         # <<<<<<<<<<<<< Kalman Filter <<<<<<<<<<<<<<<<        
-        
-        predator_buffer = {
-            'state': old_obs[0], 
-            'actions': acts[0], 
-            'rewards': rewards[0], 
-            'dones': all_done[:num_pred],
-            'values': values[0], 
-            'logps': logprobs[0],
-            'ids': range(max_nums[0]), 
-        }
-        # if 'me' in models[0].name:
-        #     predator_buffer['g'] = former_g[0]
-        # if 'mf' in models[0].name or 'ma' in models[0].name:
-        #     predator_buffer['meanaction'] = former_meanaction[0]
-        predator_buffer['prob'] = former_act_prob[0]
-        if 'sac' in models[0].name:
-            predator_buffer['next_state'] = obs[0]
+        if train:
+            predator_buffer = {
+                'state': old_obs[0], 
+                'actions': acts[0], 
+                'rewards': rewards[0], 
+                'dones': all_done[:num_pred],
+                'values': values[0], 
+                'logps': logprobs[0],
+                'ids': range(max_nums[0]), 
+            }
+            # if 'me' in models[0].name:
+            #     predator_buffer['g'] = former_g[0]
+            # if 'mf' in models[0].name or 'ma' in models[0].name:
+            #     predator_buffer['meanaction'] = former_meanaction[0]
+            predator_buffer['prob'] = former_act_prob[0]
+            if 'sac' in models[0].name:
+                predator_buffer['next_state'] = obs[0]
 
-        prey_buffer = {
-            'state': old_obs[1], 
-            'actions': acts[1], 
-            'rewards': rewards[1], 
-            'dones': all_done[num_pred:],
-            'values': values[1], 
-            'logps': logprobs[1],
-            'ids': range(max_nums[1]), 
-        }
-        # if 'me' in models[1].name:
-        #     prey_buffer['g'] = former_g[1]
-        # if 'mf' in models[1].name or 'ma' in models[1].name:
-        #     prey_buffer['meanaction'] = former_meanaction[1]
-        prey_buffer['prob'] = former_act_prob[1]
-        if 'sac' in models[1].name:
-            prey_buffer['next_state'] = obs[1]
+            # prey_buffer = {
+            #     'state': old_obs[1], 
+            #     'actions': acts[1], 
+            #     'rewards': rewards[1], 
+            #     'dones': all_done[num_pred:],
+            #     'values': values[1], 
+            #     'logps': logprobs[1],
+            #     'ids': range(max_nums[1]), 
+            # }
+            # # if 'me' in models[1].name:
+            # #     prey_buffer['g'] = former_g[1]
+            # # if 'mf' in models[1].name or 'ma' in models[1].name:
+            # #     prey_buffer['meanaction'] = former_meanaction[1]
+            # prey_buffer['prob'] = former_act_prob[1]
+            # if 'sac' in models[1].name:
+            #     prey_buffer['next_state'] = obs[1]
 
-        models[0].flush_buffer(**predator_buffer)
-        # models[1].flush_buffer(**prey_buffer)
+            models[0].flush_buffer(**predator_buffer)
+            # models[1].flush_buffer(**prey_buffer)
         
         #############################
         # Calculate mean field #
@@ -251,54 +253,53 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
 
         if step_ct % print_every == 0:
             print("> step #{}, info: {}".format(step_ct, info))
-    
-    # if 'ppo' in models[0].name:
-    #     predator_buffer = {
-    #         'state': obs[0], 
-    #         'acts': [None for i in range(max_nums[0])], 
-    #         'rewards': [None for i in range(max_nums[0])], 
-    #         'dones': [None for i in range(max_nums[0])],
-    #         'values': [None for i in range(max_nums[0])], 
-    #         'logps': [None for i in range(max_nums[0])],
-    #         'ids': range(max_nums[0]), 
-    #     }
-    #     if 'me' in models[0].name:
-    #         predator_buffer['g'] = np.tile(former_g[0], (max_nums[0], 1))
-    #     if 'mf' in models[0].name or 'ma' in models[0].name:
-    #         predator_buffer['meanaction'] = np.tile(former_meanaction[0], (max_nums[0], 1))
-    
-    #     models[0].flush_buffer(**predator_buffer)
-    
-    # if 'ppo' in models[1].name:
-    #     prey_buffer = {
-    #         'state': obs[1], 
-    #         'acts': [None for i in range(max_nums[1])], 
-    #         'rewards': [None for i in range(max_nums[1])], 
-    #         'dones': [None for i in range(max_nums[1])],
-    #         'values': [None for i in range(max_nums[1])], 
-    #         'logps': [None for i in range(max_nums[1])],
-    #         'ids': range(max_nums[1]), 
-    #     }
-    #     if 'me' in models[1].name:
-    #         prey_buffer['g'] = np.tile(former_g[1], (max_nums[1], 1))
-    #     if 'mf' in models[1].name or 'ma' in models[1].name:
-    #         prey_buffer['meanaction'] = np.tile(former_meanaction[1], (max_nums[1], 1))
+    if train:
+        # if 'ppo' in models[0].name:
+        #     predator_buffer = {
+        #         'state': obs[0], 
+        #         'acts': [None for i in range(max_nums[0])], 
+        #         'rewards': [None for i in range(max_nums[0])], 
+        #         'dones': [None for i in range(max_nums[0])],
+        #         'values': [None for i in range(max_nums[0])], 
+        #         'logps': [None for i in range(max_nums[0])],
+        #         'ids': range(max_nums[0]), 
+        #     }
+        #     if 'me' in models[0].name:
+        #         predator_buffer['g'] = np.tile(former_g[0], (max_nums[0], 1))
+        #     if 'mf' in models[0].name or 'ma' in models[0].name:
+        #         predator_buffer['meanaction'] = np.tile(former_meanaction[0], (max_nums[0], 1))
+        
+        #     models[0].flush_buffer(**predator_buffer)
+        
+        # if 'ppo' in models[1].name:
+        #     prey_buffer = {
+        #         'state': obs[1], 
+        #         'acts': [None for i in range(max_nums[1])], 
+        #         'rewards': [None for i in range(max_nums[1])], 
+        #         'dones': [None for i in range(max_nums[1])],
+        #         'values': [None for i in range(max_nums[1])], 
+        #         'logps': [None for i in range(max_nums[1])],
+        #         'ids': range(max_nums[1]), 
+        #     }
+        #     if 'me' in models[1].name:
+        #         prey_buffer['g'] = np.tile(former_g[1], (max_nums[1], 1))
+        #     if 'mf' in models[1].name or 'ma' in models[1].name:
+        #         prey_buffer['meanaction'] = np.tile(former_meanaction[1], (max_nums[1], 1))
 
-    #     models[1].flush_buffer(**prey_buffer)
+        #     models[1].flush_buffer(**prey_buffer)
 
 
-    models[0].train()
-    # models[1].train()
+        models[0].train()
+        # models[1].train()
 
     if render:
-        render_outdir = 'data/render/{}-{}'.format(models[0].name, models[1].name)
-        render_gif(render_outdir, obs_list, n_round)
+        # render_outdir = 'data/render/{}-{}'.format(models[0].name, models[1].name)
+        render_gif(render_dir, obs_list, n_round)
         
     for i in range(n_group):
         mean_rewards[i] = sum(total_rewards[i])/max_nums[i]
 
     return mean_rewards
-
 
 def test(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, eps=None, train=False):
     env.reset()
@@ -348,11 +349,15 @@ def test(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         #################
         # print('\n===============obs len: ', len(obs))
         for i in range(n_group):
-            # if 'mf' in models[i].name:
-            #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
-            former_act_prob[i] = np.tile(former_act_prob[i], (max_nums[i], 1))
-            acts[i], _ = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)
-            # acts[i], values[i], logprobs[i] = models[i].act(state=obs[i], meanaction=former_meanaction[i])
+            if i==0:    # pred
+                # if 'mf' in models[i].name:
+                #     former_meanaction[i] = np.tile(former_meanaction[i], (max_nums[i], 1))
+                former_act_prob[i] = np.tile(former_act_prob[i], (max_nums[i], 1))
+                acts[i], _ = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)
+            elif i==1:  # prey
+                # acts[i], values[i], logprobs[i] = models[i].act(state=obs[i], meanaction=former_meanaction[i])
+                preys = [agent for agent in env.agents if agent.adversary==False]
+                acts[1] = _get_act_preys(preys)
         ## random predator
         # acts[0] = np.random.rand(num_pred,2)*2-1  
 

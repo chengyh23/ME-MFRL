@@ -9,7 +9,7 @@ fi
 algo=$1
 
 # List of seeds
-seeds=(0 3 7)
+seeds=(7)
 # seeds=(0 3 7 11 13)
 # seeds=(0 3 7 11 13 15 18 20 32 42)
 
@@ -23,19 +23,19 @@ rsync -av --exclude-from="$project_dir/.gitignore" "$project_dir/" "$temp_dir"
 # cp train_my.py "$temp_script"
 
 
-# Function to clean up the temporary script
-cleanup() {
-    # rm -f "$temp_script"
-    rm -rf "$temp_dir"
-}
-trap cleanup EXIT
+# # Function to clean up the temporary script
+# cleanup() {
+#     # rm -f "$temp_script"
+#     rm -rf "$temp_dir"
+# }
+# trap cleanup EXIT
 
 # Loop through the seeds and run the training script
 for seed in "${seeds[@]}"; do
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --use_wandb True
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
     python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
     # python train_my.py --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --use_wandb True
 done
