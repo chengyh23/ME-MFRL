@@ -72,6 +72,128 @@ def get_data2():
 
         # plt.show()
         plt.clf()
+
+def smooth_data(data, window_size):
+    # Calculate the moving average for smoothing
+    return data.rolling(window=window_size).mean()
+
+def get_data3(seeds=[0, 3, 7], smoothing_tensorboard=0.8):
+    file_path = f'common/wandb_export_2024-06-12T09_16_23.052+08_00.csv'
+    conf = file_path.strip('.csv')
+    df = pd.read_csv(file_path)
     
+    data = []
+    groups = ['ao', 'no']
+    group_name = 'noisy'
+    for noisy in groups:
+        tmp_df = df[[f'se-R10/{noisy}/eg/dqn_500x400/3v1/{seed} - R/pred' for seed in seeds]]
+        print(tmp_df.head())
+        tmp_df_smooth = tmp_df.ewm(alpha=1-smoothing_tensorboard).mean()
+        print(tmp_df_smooth.head())
+        
+        tmp = np.array(tmp_df_smooth).T
+        data.append(tmp)
+
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name='R'))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y="R", hue=group_name, style=group_name)
+    plt.title(f"{group_name}-R_pred")
+    plt.savefig(f'common/{group_name}-R_pred.png', dpi=300)
+    plt.clf()
+def get_data4(seeds=[0, 3, 7], smoothing_tensorboard=0.99):
+    file_path = f'common/wandb_export_2024-06-12-no.csv'
+    conf = file_path.strip('.csv')
+    df = pd.read_csv(file_path)
+    
+    data = []
+    groups = ['eg', 'ka_rw', 'ka_cv']
+    group_name = 'act'
+    for act in groups:
+        tmp_df = df[[f'se-R10/no/{act}/dqn_500x400/3v1/{seed} - R/pred' for seed in seeds]]
+        print(tmp_df.head())
+        tmp_df_smooth = tmp_df.ewm(alpha=1-smoothing_tensorboard).mean()
+        # print(tmp_df_smooth.head())
+        tmp = np.array(tmp_df_smooth).T
+        data.append(tmp)
+
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name='R'))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y="R", hue=group_name, style=group_name)
+    plt.title(f"{group_name}-R_pred")
+    plt.savefig(f'common/{group_name}-R_pred.png', dpi=300)
+    plt.clf()
+    
+    
+from tensorboard.backend.event_processing import event_accumulator
+from tqdm import tqdm
+
+def get_tfboard_data(metric='Agent_0_kill_op', seeds=[0, 3, 7], smoothing_tensorboard=0.99):
+    group_name = 'obs_act'
+    groups = ['ao-eg', 'no-eg', 'no-ka_rw', 'no-ka_cv']
+    
+    data = []
+    for group in groups:
+        repeats = []
+        for seed in seeds:
+            # in_path = 'data/tmp/se-R10-ao-eg-dqn_500x400-3v1-0/dqn/events.out.tfevents.1718095850.inspur-NF5468M5'
+            in_path = f'data/tmp/se-R10-{group}-dqn_500x400-3v1-{seed}/dqn' # TODO what if multiple tfevents?
+            
+            event_data = event_accumulator.EventAccumulator(in_path)  # a python interface for loading Event data
+            event_data.Reload()  # synchronously loads all of the data written so far b
+            # print(event_data.Tags())  # print all tags
+            keys = event_data.scalars.Keys()  # get all tags,save in a list
+            print(keys)
+            df = pd.DataFrame(columns=keys)
+            for key in tqdm(keys):
+                df[key] = pd.DataFrame(event_data.Scalars(key)).value
+            # print(df.head())
+            tmp_df_smooth = df.ewm(alpha=1-smoothing_tensorboard).mean()
+            tmp = np.array(tmp_df_smooth[metric])
+            repeats.append(tmp)
+        repeats = np.vstack(repeats)
+        data.append(repeats)
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name=metric))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y=metric, hue=group_name, style=group_name)
+    plt.title(f"{group_name}-{metric}")
+    plt.savefig(f'common/{group_name}-{metric}.png', dpi=300)
+    plt.clf()
+# import tensorflow as tf
+# def read_event_file():
+#     event_file = 'data/tmp/se-R10-no-eg-dqn_500x400-3v1-0/dqn/events.out.tfevents.1718094091.inspur-NF5468M5'
+#     event_file = 'data/tmp/se-R10-no-eg-dqn_500x400-3v1-0/dqn/events.out.tfevents.1718096031.inspur-NF5468M5'
+#     events = []
+#     for event in tf.compat.v1.train.summary_iterator(event_file):
+#         for value in event.summary.value:
+#             events.append({
+#                 'step': event.step,
+#                 'wall_time': event.wall_time,
+#                 'tag': value.tag,
+#                 'value': value.simple_value
+#             })
+#     print(events)
+#     # return events
+
+# Example usage
+
+
 if __name__ == '__main__':
-    get_data2()
+    # get_data4()
+    get_tfboard_data(metric='Agent_0_kill_op')
+    get_tfboard_data(metric='Agent_0_step_ct_op')
+    # read_event_file()

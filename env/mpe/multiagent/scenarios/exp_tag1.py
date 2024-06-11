@@ -108,7 +108,7 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.25, 0.25, 0.25])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            agent.state.p_pos = np.random.uniform(-0.2, +0.2, world.dim_p)
             if isinstance(agent, Evader):
                 _x, _y = agent.sample_point_on_path()
                 # agent.state.p_pos = np.array([agent.x1,agent.y1])
@@ -116,6 +116,8 @@ class Scenario(BaseScenario):
                 
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
+            if isinstance(agent, Evader):
+                agent.movable = True
         for i, landmark in enumerate(world.landmarks):
             if not landmark.boundary:
                 landmark.state.p_pos = np.random.uniform(-0.9, +0.9, world.dim_p)
@@ -149,7 +151,14 @@ class Scenario(BaseScenario):
             ret.append(z)
             # ret.append(agent.state.p_pos - observer.state.p_pos)
         return ret
-
+    
+    def done(self, agent, world):
+        evaders = self.good_agents(world)
+        if evaders[0].movable == False: # only 1 evader, if it is dead, all agents are done
+            return True
+        else:
+            return False
+        
     def is_collision(self, agent1, agent2):
         delta_pos = agent1.state.p_pos - agent2.state.p_pos
         dist = np.sqrt(np.sum(np.square(delta_pos)))
@@ -166,11 +175,42 @@ class Scenario(BaseScenario):
 
 
     def reward(self, agent, world):
-        # # Agents are rewarded based on minimum agent distance to each landmark
+        # Agents are rewarded based on minimum agent distance to each landmark
         # main_reward = self.adversary_reward(agent, world) if agent.adversary else self.agent_reward(agent, world)
-        main_reward = self.zero_sum_reward(agent, world)
+        # main_reward = self.zero_sum_reward(agent, world)
+        main_reward = self.pursuer_reward(agent, world) if agent.adversary else self.evader_reward(agent, world)
         return main_reward
     
+    def pursuer_reward(self, agent, world):
+        R_CAPTOR = +10
+        R_HELPER = +6
+        
+        evader = self.good_agents(world)[0]
+        adversaries = self.adversaries(world)
+        role = 'idle'
+        for pursuer in adversaries:
+            if agent.name == pursuer.name: continue
+            if self.is_collision(evader, pursuer): role = 'helper'
+        if self.is_collision(evader, agent): role = 'captor'
+        
+        rew = 0.0
+        if role == 'captor':
+            rew += R_CAPTOR
+        elif role == 'helper': 
+            rew += R_HELPER
+        else:
+            rew += -0.1 * np.sqrt(np.sum(np.square(agent.state.p_pos - evader.state.p_pos)))
+        return rew
+    def evader_reward(self, agent, world):
+        adversaries = self.adversaries(world)
+        captured = False
+        for pursuer in adversaries:
+            if self.is_collision(agent, pursuer):
+                captured = True
+                agent.movable = False   # inform that it is done
+        if captured: print('[evader_reward] check done')
+        return -10 if captured else 0
+        
     def zero_sum_reward(self, agent, world):
         rew = 0
         group_pred = self.adversaries(world)
@@ -182,6 +222,10 @@ class Scenario(BaseScenario):
             for a in opponents:
                 if self.is_collision(a, agent):
                     rew += 10 if agent.adversary else -10
+                    if not agent.adversary:
+                        assert isinstance(agent, Evader)
+                        if agent.movable: print("hiahia, Evader newly captured!")
+                        agent.movable = False   # REMEMBER to reset in reset_world()
         return rew
                     
     def agent_reward(self, agent, world):

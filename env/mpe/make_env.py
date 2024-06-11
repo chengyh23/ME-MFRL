@@ -44,7 +44,7 @@ def make_env(scenario_name, num_adversaries=30, num_good_agents=10, \
     world = scenario.make_world(num_adversaries, num_good_agents, noisy_obs, use_kf_act, kf_proc_model)
     # create multiagent environment
     if benchmark:        
-        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, 
+        env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, scenario.done,
                             discrete_action_space=discrete_action_space, discrete_action_input=discrete_action_input)
     else:
         env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, 

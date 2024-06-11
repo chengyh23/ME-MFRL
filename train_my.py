@@ -62,6 +62,7 @@ def linear_decay(epoch, x, y):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--algo', type=str, choices={'attention_mfq', 'ac', 'mfac', 'mfq', 'dqn', 'me_mfq','me_mfq_leg','ppo','sac'}, help='choose an algorithm from the preset', required=True)
+    parser.add_argument('--test', action='store_true', help='train (default) or test')
     parser.add_argument('--n_round', type=int, default=500, help='set the trainning round')
     parser.add_argument('--render', action='store_true', help='[for train] render or not (if true, will render every save)')
     parser.add_argument('--render_every', type=int, default=50, help='decide the render interval')
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1, help='random seed')
     parser.add_argument('--order', type=int, default=4, help='moment order')
     parser.add_argument('--num_adversaries', type=int, default=3, help='number of predators')
-    parser.add_argument('--num_good_agents', type=int, default=2, help='number of preys')
+    parser.add_argument('--num_good_agents', type=int, default=1, help='number of preys')
     parser.add_argument('--noisy_obs', action='store_true', help='add noise to observation')   # 
     parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
     parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
@@ -80,12 +81,12 @@ if __name__ == '__main__':
     parser.add_argument('--use_wandb', action='store_true', help='log onto wandb or not')
     # test
     parser.add_argument('--pred_dir', type=str, help='the path of the algorithm')
-    parser.add_argument('--idx', nargs='*', required=True)
+    parser.add_argument('--idx', nargs='*', help="required=True if testing")
     parser.add_argument('--test_max_steps', type=int, default=100, help='set the test max steps')
     
     args = parser.parse_args()
     # _name = ""
-    _name = "se"    # silly evader (fixed behavior)
+    _name = "se-R10"    # silly evader (fixed behavior)
     _name += "/no" if args.noisy_obs else "/ao" # noiobs OR accobs
     _name += f"/ka_{args.kf_proc_model}" if args.use_kf_act else "/eg"    # kfact OR epsgr
     _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
@@ -116,7 +117,10 @@ if __name__ == '__main__':
     out_name = _name.replace('/', '-')
     log_dir = os.path.join(BASE_DIR,'data/tmp/{}'.format(out_name))
     model_dir = os.path.join(BASE_DIR, 'data/models/{}'.format(out_name))
-    render_dir = os.path.join(BASE_DIR, 'data/render/{}/{}'.format(out_name, args.idx[0]))
+    if args.test:
+        render_dir = os.path.join(BASE_DIR, 'data/render/{}/{}'.format(out_name, args.idx[0]))
+    else:
+        render_dir = os.path.join(BASE_DIR, 'data/render/{}'.format(out_name))
 
     if args.algo == 'me_mfq':
         log_dir = os.path.join(BASE_DIR,f'data/tmp/{args.algo}_{args.order}_{args.seed}')
@@ -137,19 +141,19 @@ if __name__ == '__main__':
 
     sess.run(tf.global_variables_initializer())
     
-    _train = False
-    if _train:
-        if not args.render_every == argrs.save_every:
-            raise Warning("Attention: render_every != save_every")
+    if not args.test:   # train
+        # if not args.render_every == args.save_every:
+        #     raise Warning("Attention: render_every != save_every")
         runner = tools.Runner(sess, env, None, args.map_size, args.max_steps, models, play,
-                                render_every=args.save_every if args.render else 0, save_every=args.save_every, tau=0.01, log_name=args.algo,
+                                render_every=args.render_every if args.render else 0, render_dir=render_dir, save_every=args.save_every, tau=0.01, log_name=args.algo,
                                 log_dir=log_dir, model_dir=model_dir, train=True, use_kf_act=args.use_kf_act, use_wandb=args.use_wandb)
         print(f'\n\nnoisy_obs: {args.noisy_obs}, use_kf_act: {args.use_kf_act}, kf_proc_model: {args.kf_proc_model}')
         print("\n\n=== {0} ROUNDs x {1} STEPs ===".format(args.n_round, args.max_steps))
         for k in range(start_from, start_from + args.n_round):
             eps = linear_decay(k, [0, int(args.n_round * 0.8), args.n_round], [1, 0.2, 0.1])
             runner.run(eps, k)
-    elif _train == False:
+    elif args.test:
+        assert args.idx is not None
         if not args.render:
             raise Exception("Sure that do not render when testing?")
         models[0].load(model_dir + '-predator', step=args.idx[0])

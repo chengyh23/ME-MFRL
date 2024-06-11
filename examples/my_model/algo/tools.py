@@ -363,7 +363,7 @@ class Runner(object):
         if self.train:
             self.summary = SummaryObj(log_name=log_name, log_dir=log_dir)
 
-            summary_items = ['ave_agent_reward', 'mean_reward', 'kill', "Sum_Reward", "Kill_Sum"]
+            summary_items = ['ave_agent_reward', 'mean_reward', 'kill', "Sum_Reward", "Kill_Sum", "step_ct"]
             self.summary.register(summary_items)  # summary register
             self.summary_items = summary_items
 
@@ -381,8 +381,8 @@ class Runner(object):
         render = (iteration + 1) % self.render_every == 0 if self.render_every > 0 else False
         # render = render and not self.train    # only render when testing
         if render:
-            print(f'Render @iter{iteration}')
-        mean_rewards = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,
+            print(f'Render @iter{iteration} -> {self.render_dir}')
+        mean_rewards, done, step_ct = self.play(env=self.env, n_round=iteration, map_size=self.map_size, max_steps=self.max_steps, handles=self.handles,
                     models=self.models, print_every=50, eps=variant_eps, render=render, render_dir=self.render_dir, train=self.train, use_kf_act=self.use_kf_act)
 
         for i, tag in enumerate(['predator', 'prey']):
@@ -392,7 +392,10 @@ class Runner(object):
         log_info = dict()
         for key, value in info.items():
             log_info.update({key + 'tot_rew': value['mean_reward']})
-
+        
+        # Success rate & average steps
+        self.summary.write({'kill': float(done), 'step_ct': step_ct}, iteration)
+        
         if self.train:
             print('\n[INFO] {}'.format(info))
             if self.use_wandb:

@@ -13,9 +13,6 @@ from env.mpe.make_env import make_env
 
 logging.basicConfig(level=logging.ERROR)
 
-num_pred = 30
-num_prey = 10
-
 # order = 4
 # moment_dim = order * 2
 # bin_dim = order ** 2
@@ -57,7 +54,7 @@ def _cal_ca(a, order=4):
     c_a = np.array(c_a).T
     return c_a.reshape(1,-1)
 
-def kf_step(env,all_info):
+def kf_step(env,all_info,num_pred):
     # kf_system.predict()
     for agent in env.agents:
         agent.kf.predict()
@@ -109,16 +106,12 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
     n_group = 2
 
     rewards = [None for _ in range(n_group)]
-    _num_pred = 0
-    _num_prey = 0
+    num_pred = 0
+    num_prey = 0
     for agent in env.agents:
-        if agent.adversary: _num_pred += 1
-        else: _num_prey += 1
-    #
-    num_pred = _num_pred
-    num_prey = _num_prey
-    assert num_pred==_num_pred
-    assert num_prey==_num_prey
+        if agent.adversary: num_pred += 1
+        else: num_prey += 1
+        
     max_nums = [num_pred, num_prey]  # num_pred predators, 40 prey
 
 
@@ -177,7 +170,8 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         all_obs, all_rewards, all_done, all_info = env.step(stack_act)
         obs = [all_obs[:num_pred], all_obs[num_pred:]]
         rewards = [all_rewards[:num_pred], all_rewards[num_pred:]]
-        done = all(all_done)
+        # done = all(all_done)
+        done = all(all_done[num_pred:])
         if train==False:
             if done:
                 raise Exception
@@ -186,7 +180,7 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         # >>>>>>>>>>>>> Kalman Filter >>>>>>>>>>>>>>>>
         # print(all_info)
         if use_kf_act:
-            kf_step(env, all_info)
+            kf_step(env, all_info, num_pred)
         # <<<<<<<<<<<<< Kalman Filter <<<<<<<<<<<<<<<<        
         if train:
             predator_buffer = {
@@ -244,6 +238,7 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
             
         for i in range(n_group):
             sum_reward = sum(rewards[i])
+            mean_rewards[i].append(sum_reward / max_nums[i])
             total_rewards[i].append(sum_reward)
             
 
@@ -251,6 +246,7 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
 
         step_ct += 1
 
+        if done: print("> step #{}, done!!!".format(step_ct))
         if step_ct % print_every == 0:
             print("> step #{}, info: {}".format(step_ct, info))
     if train:
@@ -297,9 +293,10 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         render_gif(render_dir, obs_list, n_round)
         
     for i in range(n_group):
-        mean_rewards[i] = sum(total_rewards[i])/max_nums[i]
+        mean_rewards[i] = sum(mean_rewards[i]) / len(mean_rewards[i])
+        # mean_rewards[i] = sum(total_rewards[i])/max_nums[i]
 
-    return mean_rewards
+    return mean_rewards, done, step_ct
 
 def test(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, eps=None, train=False):
     env.reset()

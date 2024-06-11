@@ -97,6 +97,9 @@ class Evader(Agent):
         self.y1 = -1 + 0.2
         self.y2 = +1 - 0.2
         # self.step = 0.05    # TODO keep conssitent with mpe
+        # # if a Evader dies, set self.movable = False
+        # self.alive = True
+        
     def sample_point_on_path(self):
         # Lengths of each side of the rectangle
         length_down = self.x2 - self.x1
@@ -135,6 +138,8 @@ class Evader(Agent):
         # called by world.step()
         # rect_dirs = ['right', 'down', 'left', 'up']
         #               2 ----> 4 ----> 1 ----> 3
+        if not self.movable:
+            return
         _pos = self.state.p_pos
         if self.direction == 2:
             if _pos[0] >= self.x2:
@@ -157,6 +162,8 @@ class Evader(Agent):
             # 2: (+1, 0)
             # 3: (0, -1)
             # 4: (0, +1)
+        if not self.movable:
+            return 0
         action = self.direction   # 大方向
         thr = 0.1
         if self.direction == 2:
