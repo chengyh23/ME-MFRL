@@ -91,12 +91,36 @@ def kf_step(env,all_info,num_pred):
     # prey_cov = np.concatenate(all_cov[num_pred:])
     # # each agent use cov of its opponent agents
     # cov = [np.tile(prey_cov, (num_pred,1)), np.tile(pred_cov, (num_prey,1))]
+class ModelEvader:
+    def __init__(self, algo_name, env):
+        self.algo_name = algo_name
+        self.env = env
+    def act(self, obs):
+        pursuers = [agent for agent in self.env.agents if agent.adversary==True]
+        evaders = [agent for agent in self.env.agents if agent.adversary==False]
+        
+        if self.env.discrete_action_space:
+            actions = np.zeros(len(evaders), dtype=np.int32)
+        else:
+            actions = np.zeros((len(evaders),2), dtype=np.float32)
+        
+        pursuers_positions = []
+        for i,pursuer in enumerate(pursuers):
+            pursuers_positions.append(pursuer.kf.x[:2])
+        
+        for i,evader in enumerate(evaders):
+            actions[i] = evader._get_act(self.env.discrete_action_space, pursuers_positions=pursuers_positions)
+        return actions
     
-def _get_act_preys(evaders):
-    actions = np.zeros(len(evaders), dtype=np.int32)
-    for i,evader in enumerate(evaders):
-        actions[i] = evader._get_act()
-    return actions
+# def _get_act_preys(evaders, env):
+#     if env.discrete_action_space:
+#         actions = np.zeros(len(evaders), dtype=np.int32)
+#     else:
+#         actions = np.zeros((len(evaders),2), dtype=np.float32)
+#     for i,evader in enumerate(evaders):
+#         actions[i] = evader._get_act(env.discrete_action_space)
+
+#     return actions
 
 def play(env, n_round, map_size, max_steps, handles, models, print_every=10, record=False, render=False, render_dir=None, eps=None, train=False, use_kf_act=False):
     env.reset()
@@ -159,11 +183,12 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
                 #     former_g[i] = np.tile(former_g[i], (max_nums[i], 1))
                 former_act_prob[0] = np.tile(former_act_prob[0], (max_nums[0], 1))
                 # kf_cov[i] = env.world.good_agents()
-                acts[0], _, logprobs[0] = models[0].act(obs=obs[0], prob=former_act_prob[0], eps=eps, train=True)   # TODO only mean-field of allies? not considering that of opponents?
+                acts[0], _, logprobs[0] = models[0].act(obs=obs[0], prob=former_act_prob[0], eps=eps, train=train)   # TODO only mean-field of allies? not considering that of opponents?
                 # acts[i], _, logprobs[i] = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)   # Continuous Action space
             elif i==1:  # prey acts following fixed paths
                 preys = [agent for agent in env.agents if agent.adversary==False]
-                acts[1] = _get_act_preys(preys)
+                # acts[1] = _get_act_preys(preys, env)
+                acts[1] = models[1].act(obs=obs[1])
         
         old_obs = obs
         stack_act = np.concatenate(acts, axis=0)
@@ -172,9 +197,6 @@ def play(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
         rewards = [all_rewards[:num_pred], all_rewards[num_pred:]]
         # done = all(all_done)
         done = all(all_done[num_pred:])
-        if train==False:
-            if done:
-                raise Exception
         stack_act = [stack_act[:num_pred], stack_act[num_pred:]]
         
         # >>>>>>>>>>>>> Kalman Filter >>>>>>>>>>>>>>>>
@@ -353,8 +375,9 @@ def test(env, n_round, map_size, max_steps, handles, models, print_every=10, rec
                 acts[i], _ = models[i].act(obs=obs[i], prob=former_act_prob[i], eps=eps, train=True)
             elif i==1:  # prey
                 # acts[i], values[i], logprobs[i] = models[i].act(state=obs[i], meanaction=former_meanaction[i])
-                preys = [agent for agent in env.agents if agent.adversary==False]
-                acts[1] = _get_act_preys(preys)
+                # preys = [agent for agent in env.agents if agent.adversary==False]
+                # acts[1] = _get_act_preys(preys)
+                acts[1] = models[i].act()
         ## random predator
         # acts[0] = np.random.rand(num_pred,2)*2-1  
 

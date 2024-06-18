@@ -196,7 +196,9 @@ class ValueNet:
             #     actions = np.argmax(pi, axis=1).astype(np.int32)
                 
             if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:   # exploration
-                # print('wow! exploring~', end=' ')
+            # if np.random.rand() < 0.4 * kwargs['eps'] - 0.15:   # exploration   (E4)
+            # if np.random.rand() < 0.6 * kwargs['eps'] - 0.15:   # exploration   (E6)
+                # print('wow! exploring~')
                 if self.use_kf_act and np.random.rand() < sigmoid(-Uc)*0.5:  # KF-guided exploration
                     # print('KF guided', Uc)
                     actions = self._kf_guided_act()

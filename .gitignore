@@ -8,6 +8,8 @@ wandb/
 *.png
 common/*.png
 common/*.csv
+common/csv/
+baseline/*.gif
 *.out
 __pycache__/
 

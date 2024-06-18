@@ -34,13 +34,32 @@ trap cleanup EXIT
 # Loop through the seeds and run the training script
 for seed in "${seeds[@]}"; do
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --use_wandb True
+    # # Mv1
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
+    
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 5 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
+    
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 7 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 7 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 7 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 7 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
+    
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_kf_act --kf_proc_model rw --use_wandb
+    
+    python "$temp_dir/baseline/rl_torch.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_wandb
+    # # MvN
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 30 --num_good_agents 10 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
     # python train_my.py --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --use_wandb True
 done

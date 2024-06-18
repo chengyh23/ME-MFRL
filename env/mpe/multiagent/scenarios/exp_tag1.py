@@ -1,5 +1,5 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark, Evader
+from multiagent.core import World, Agent, Landmark, Evader, EvaderRect, EvaderRepulsive
 from multiagent.scenario import BaseScenario
 
 
@@ -12,9 +12,9 @@ def create_kalman_filter(proc_model): # , dt, process_noise, measurement_noise, 
     # R: Measurement noise covariance matrix
     # P: Initial state covariance matrix
     # x: Initial state (position and velocity)
-    if proc_model == 'cv':
+    if proc_model == 'rw':
         return kalman_filter_rw()
-    elif proc_model == 'rw':
+    elif proc_model == 'cv':
         return kalman_filter_cv()
     else:
         raise NotImplementedError('Proc model {} not implemented!'.format(proc_model))
@@ -61,7 +61,7 @@ def kalman_filter_cv():
 # <<<<<<<<<<<<< Kalman Filter <<<<<<<<<<<<<<<<        
 
 class Scenario(BaseScenario):
-    def make_world(self, num_adversaries=30, num_good_agents=10, noisy_obs=False, use_kf_act=False, kf_proc_model=None):
+    def make_world(self, num_adversaries=30, num_good_agents=10, noisy_obs=False, noisy_factor=1, use_kf_act=False, kf_proc_model=None, evader_strategy='repulsive'):
         world = World()
         # set any world properties first
         world.dim_c = 2
@@ -70,9 +70,17 @@ class Scenario(BaseScenario):
         num_agents = num_adversaries + num_good_agents
         num_landmarks = 0   # 20
         self.noisy_obs = noisy_obs
+        self.noisy_factor = noisy_factor
         self.use_kf_act = use_kf_act
         # add agents
-        world.agents = [Agent() for i in range(num_adversaries)] + [Evader() for i in range(num_good_agents)]
+        _Evader = None
+        if evader_strategy=='repulsive':
+            _Evader = EvaderRepulsive
+        elif evader_strategy=='rect':
+            _Evader = EvaderRect
+        else:
+            raise NotImplementedError('Please provide a valid evader strategy!')
+        world.agents = [Agent() for i in range(num_adversaries)] + [_Evader() for i in range(num_good_agents)]
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             if use_kf_act:
@@ -110,7 +118,7 @@ class Scenario(BaseScenario):
         for agent in world.agents:
             agent.state.p_pos = np.random.uniform(-0.2, +0.2, world.dim_p)
             if isinstance(agent, Evader):
-                _x, _y = agent.sample_point_on_path()
+                _x, _y = agent.sample_initial_pos()
                 # agent.state.p_pos = np.array([agent.x1,agent.y1])
                 agent.state.p_pos = np.array([_x, _y])
                 
@@ -208,7 +216,8 @@ class Scenario(BaseScenario):
             if self.is_collision(agent, pursuer):
                 captured = True
                 agent.movable = False   # inform that it is done
-        if captured: print('[evader_reward] check done')
+        if captured: 
+            print('[evader_reward] check done')
         return -10 if captured else 0
         
     def zero_sum_reward(self, agent, world):
@@ -277,8 +286,8 @@ class Scenario(BaseScenario):
     def _noisy_rel_pos(self, delta_pos):
         dist = np.sqrt(np.sum(np.square(delta_pos)))
         noise_mean = 0
-        noise_std_dev = 1.0 * dist
-        # noise_std_dev = 0.1 * dist
+        # noise_std_dev = 1.0 * dist
+        noise_std_dev = self.noisy_factor * dist
         noise = np.random.normal(noise_mean, noise_std_dev, size=delta_pos.shape)
         delta_pos_noisy = delta_pos + noise
         return delta_pos_noisy

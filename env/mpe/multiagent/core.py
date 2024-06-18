@@ -77,11 +77,22 @@ class Agent(Entity):
         self.action = Action()
         # script behavior to execute
         self.action_callback = None
+    
 class Evader(Agent):
     def __init__(self):
         super(Evader, self).__init__()
         # change value of variable in the parent class
         self.collide = False
+    def sample_initial_pos(self):
+        raise NotImplementedError()
+    def _update(self):
+        raise NotImplementedError()
+    def _get_act(self):
+        raise NotImplementedError()
+    
+class EvaderRect(Evader):
+    def __init__(self):
+        super(EvaderRect, self).__init__()
         
         # new variable members
         self.direction = 2  # initilization
@@ -100,12 +111,12 @@ class Evader(Agent):
         # # if a Evader dies, set self.movable = False
         # self.alive = True
         
-    def sample_point_on_path(self):
+    def sample_initial_pos(self):
         # Lengths of each side of the rectangle
         length_down = self.x2 - self.x1
         length_right = self.y2 - self.y1
-        length_up = self.x1 - self.x2  # Negative because moving left
-        length_left = self.y1 - self.y2    # Negative because moving up
+        length_up = -(self.x1 - self.x2)
+        length_left = -(self.y1 - self.y2)
 
         total_length = (length_right + length_down)*2
         _p = np.random.uniform(0, total_length)
@@ -131,7 +142,8 @@ class Evader(Agent):
             distance_traveled += length_right + length_down + length_left
             x = self.x1 + (_p - distance_traveled)
             y = self.y1
-
+        assert x<=self.x2 and x>=self.x1
+        assert y<=self.y2 and y>=self.y1
         return (x, y)
     
     def _update(self):
@@ -155,7 +167,7 @@ class Evader(Agent):
                 self.direction = 2
         else:
             raise ValueError("Invalid evader direction")
-    def _get_act(self):
+    def _get_act(self, discrete_action_space: bool, pursuers_positions=None):
         # consistent with _set_action() in MultiAgentEnv
             # 0: (0, 0)
             # 1: (-1, 0)
@@ -164,32 +176,132 @@ class Evader(Agent):
             # 4: (0, +1)
         if not self.movable:
             return 0
-        action = self.direction   # 大方向
+        _action = self.direction   # 大方向
         thr = 0.1
         if self.direction == 2:
             if self.state.p_pos[1] < self.y1 - thr:
-                action = 4
+                _action = 4
             if self.state.p_pos[1] > self.y1 + thr:
-                action = 3
+                _action = 3
         elif self.direction == 4:
             if self.state.p_pos[0] < self.x2 - thr:
-                action = 2
+                _action = 2
             if self.state.p_pos[0] > self.x2 + thr:
-                action = 1
+                _action = 1
         elif self.direction == 1:
             if self.state.p_pos[1] < self.y2 - thr:
-                action = 4
+                _action = 4
             if self.state.p_pos[1] > self.y2 + thr:
-                action = 3
+                _action = 3
         elif self.direction == 3:
             if self.state.p_pos[0] < self.x1 - thr:
-                action = 2
+                _action = 2
             if self.state.p_pos[0] > self.x1 + thr:
-                action = 1
+                _action = 1
         # print(self.state.p_pos)
         # print(self.direction, action)
-        return action
+        if discrete_action_space:
+            return _action
+        else:
+            discrete2cont = [
+                [0, 0],
+                [-1, 0],
+                [+1, 0],
+                [0, -1],
+                [0, +1]
+            ]
+            action = discrete2cont[_action]
+            return action
+        
+class EvaderRepulsive(Evader):
+    def __init__(self):
+        super(EvaderRepulsive, self).__init__()
     
+    # Function to compute the repulsive force from a pursuer
+    def compute_repulsive_force(self, pursuer_pos):
+        C_PURSUER_REPULSION = 10.0  # Adjust this constant to tune repulsion strength
+
+        evader_pos = self.state.p_pos
+        direction = evader_pos - pursuer_pos
+        distance = np.linalg.norm(direction)
+        if distance == 0:
+            return np.zeros_like(evader_pos)  # Avoid division by zero
+        force_magnitude = C_PURSUER_REPULSION / (distance ** 2)  # Inverse-square law
+        force = force_magnitude * direction / distance
+        return force
+    
+    def compute_boundary_force(self):
+        C_BOUNDARY_REPULSION = 1.0
+        
+        force = np.zeros_like(self.state.p_pos)
+        xmin, xmax, ymin, ymax = -1, +1, -1, +1
+        buffer_d = 0.3
+        x, y = self.state.p_pos[0], self.state.p_pos[1]
+        if x < xmin + buffer_d:
+            force[0] += C_BOUNDARY_REPULSION / (x - xmin) ** 2
+        elif x > xmax - buffer_d:
+            force[0] -= C_BOUNDARY_REPULSION / (xmax - x) ** 2
+
+        if y < ymin + buffer_d:
+            force[1] += C_BOUNDARY_REPULSION / (y - ymin) ** 2
+        elif y > ymax - buffer_d:
+            force[1] -= C_BOUNDARY_REPULSION / (ymax - y) ** 2
+
+        return force
+    
+    def _get_act(self, discrete_action_space: bool, pursuers_positions):
+        total_force = np.zeros_like(self.state.p_pos)
+        for pursuer_pos in pursuers_positions:
+            total_force += self.compute_repulsive_force(pursuer_pos)
+        total_force += self.compute_boundary_force()
+        
+        if discrete_action_space:
+            from baseline.janosov import cont2discrete_act
+            return cont2discrete_act(total_force)
+        else:
+            return total_force
+    def _update(self):
+        pass
+    
+    def sample_initial_pos(self):
+        # Rectangular ring
+        self.x1 = -1 + 0.2
+        self.x2 = +1 - 0.2
+        self.y1 = -1 + 0.2
+        self.y2 = +1 - 0.2
+        # Lengths of each side of the rectangle
+        length_down = self.x2 - self.x1
+        length_right = self.y2 - self.y1
+        length_up = -(self.x1 - self.x2)
+        length_left = -(self.y1 - self.y2)
+
+        total_length = (length_right + length_down)*2
+        _p = np.random.uniform(0, total_length)
+
+        # Determine which side the point falls on
+        distance_traveled = 0
+        if _p < length_right:
+            # On the right side
+            x = self.x2
+            y = self.y1 + (_p - distance_traveled)
+        elif _p < length_right + length_down:
+            # On the down side
+            distance_traveled += length_right
+            x = self.x2 - (_p - distance_traveled)
+            y = self.y2
+        elif _p < length_right + length_down + length_left:
+            # On the left side
+            distance_traveled += length_right + length_down
+            x = self.x1
+            y = self.y2 - (_p - distance_traveled)
+        else:
+            # On the up side
+            distance_traveled += length_right + length_down + length_left
+            x = self.x1 + (_p - distance_traveled)
+            y = self.y1
+        assert x<=self.x2 and x>=self.x1
+        assert y<=self.y2 and y>=self.y1
+        return (x, y)
 # multi-agent world
 class World(object):
     def __init__(self):

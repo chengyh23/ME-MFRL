@@ -2,6 +2,7 @@
 Plot R-episode
 强化学习,seaborn
 """
+import os
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
 import numpy as np
@@ -133,6 +134,116 @@ def get_data4(seeds=[0, 3, 7], smoothing_tensorboard=0.99):
     plt.savefig(f'common/{group_name}-R_pred.png', dpi=300)
     plt.clf()
     
+def get_data5(seeds=[0, 3, 7], smoothing_tensorboard=0.99, y_range=(-1.5,0.25)):
+    """ Impact of noisy_factor """
+    out_dir = 'common/fig'
+    file_dir = 'common/csv'
+    file_paths = ['wandb_export_2024-06-12-no.csv', \
+                  'wandb_export_2024-06-13-no2.csv', 'wandb_export_2024-06-13-no10.csv']
+    
+    data = []
+    act = 'eg'
+    # groups = ['eg', 'ka_rw', 'ka_cv']
+    groups = ['no', 'no2', 'no10']
+    group_name = 'noisy_factor'
+    for i,group in enumerate(groups):
+        conf = file_paths[i].strip('.csv')
+        df = pd.read_csv(os.path.join(file_dir, file_paths[i]))
+        tmp_df = df[[f'se-R10/{group}/{act}/dqn_500x400/3v1/{seed} - R/pred' for seed in seeds]]
+        print(tmp_df.head())
+        tmp_df_smooth = tmp_df.ewm(alpha=1-smoothing_tensorboard).mean()
+        # print(tmp_df_smooth.head())
+        tmp = np.array(tmp_df_smooth).T
+        data.append(tmp)
+
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name='R'))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y="R", hue=group_name, style=group_name)
+    if y_range is not None:
+        plt.ylim(y_range)
+    plt.title(f"{group_name}-R_pred-{act}")
+    plt.savefig(os.path.join(out_dir, f'{group_name}-R_pred-{act}.png'), dpi=300)
+    plt.clf()  
+
+def get_data6(seeds=[0, 3, 7], smoothing_tensorboard=0.99, y_range=(-1.5,0.25)):
+    """ Impact of # pursuers """
+    out_dir = 'common/fig'
+    file_dir = 'common/csv'
+    file_paths = ['wandb_export_2024-06-12-3v1.csv', \
+                  'wandb_export_2024-06-13-5v1.csv', 'wandb_export_2024-06-13-7v1.csv']
+    
+    data = []
+    act = 'ka_cv'
+    # groups = ['eg', 'ka_rw', 'ka_cv']
+    groups = ['3v1', '5v1', '7v1']
+    group_name = 'num_pursuer'
+    for i,group in enumerate(groups):
+        conf = file_paths[i].strip('.csv')
+        df = pd.read_csv(os.path.join(file_dir, file_paths[i]))
+        _noisy = 'no' if group=='3v1' else 'no1'
+        tmp_df = df[[f'se-R10/{_noisy}/{act}/dqn_500x400/{group}/{seed} - R/pred' for seed in seeds]]
+        print(tmp_df.head())
+        tmp_df_smooth = tmp_df.ewm(alpha=1-smoothing_tensorboard).mean()
+        # print(tmp_df_smooth.head())
+        tmp = np.array(tmp_df_smooth).T
+        data.append(tmp)
+
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name='R'))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y="R", hue=group_name, style=group_name)
+    if y_range is not None:
+        plt.ylim(y_range)
+    plt.title(f"{group_name}-R_pred-{act}")
+    plt.savefig(os.path.join(out_dir, f'{group_name}-R_pred-{act}.png'), dpi=300)
+    plt.clf()  
+
+def get_data7(seeds=[0, 3, 7], smoothing_tensorboard=0.99, y_range=(-1.5,0.25)):
+    """ Impact of Eps """
+    out_dir = 'common/fig'
+    file_dir = 'common/csv'
+    file_paths = ['wandb_export_2024-06-12-3v1.csv', \
+                  'wandb_export_2024-06-13-E4.csv', 'wandb_export_2024-06-13-E6.csv']
+    
+    data = []
+    act = 'ka_rw'
+    # groups = ['eg', 'ka_rw', 'ka_cv']
+    groups = ['3v1', 'E4', 'E6']
+    group_name = 'Eps'
+    for i,group in enumerate(groups):
+        conf = file_paths[i].strip('.csv')
+        df = pd.read_csv(os.path.join(file_dir, file_paths[i]))
+        _eps = '' if group=='3v1' else f'-{group}'
+        _noisy = 'no' if group=='3v1' else 'no1'
+        tmp_df = df[[f'se-R10{_eps}/{_noisy}/{act}/dqn_500x400/3v1/{seed} - R/pred' for seed in seeds]]
+        print(tmp_df.head())
+        tmp_df_smooth = tmp_df.ewm(alpha=1-smoothing_tensorboard).mean()
+        # print(tmp_df_smooth.head())
+        tmp = np.array(tmp_df_smooth).T
+        data.append(tmp)
+
+    # return data
+    df=[]
+    for i in range(len(data)):
+        df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name='R'))
+        df[i][group_name]= groups[i]
+    df=pd.concat(df) # 合并
+    print(df.head())
+    sns.lineplot(data=df,x="episode", y="R", hue=group_name, style=group_name)
+    if y_range is not None:
+        plt.ylim(y_range)
+    plt.title(f"{group_name}-R_pred-{act}")
+    plt.savefig(os.path.join(out_dir, f'{group_name}-R_pred-{act}.png'), dpi=300)
+    plt.clf()  
     
 from tensorboard.backend.event_processing import event_accumulator
 from tqdm import tqdm
@@ -193,7 +304,7 @@ def get_tfboard_data(metric='Agent_0_kill_op', seeds=[0, 3, 7], smoothing_tensor
 
 
 if __name__ == '__main__':
-    # get_data4()
-    get_tfboard_data(metric='Agent_0_kill_op')
-    get_tfboard_data(metric='Agent_0_step_ct_op')
+    get_data7()
+    # get_tfboard_data(metric='Agent_0_kill_op')
+    # get_tfboard_data(metric='Agent_0_step_ct_op')
     # read_event_file()

@@ -393,8 +393,9 @@ class Runner(object):
         for key, value in info.items():
             log_info.update({key + 'tot_rew': value['mean_reward']})
         
-        # Success rate & average steps
-        self.summary.write({'kill': float(done), 'step_ct': step_ct}, iteration)
+        if self.train:
+            # Success rate & average steps
+            self.summary.write({'kill': float(done), 'step_ct': step_ct}, iteration)
         
         if self.train:
             print('\n[INFO] {}'.format(info))
@@ -409,5 +410,5 @@ class Runner(object):
             mean_reward['predator'].append(info['predator']['mean_reward'])
             mean_reward['prey'].append(info['prey']['mean_reward'])
             print('\n[INFO] {0}'.format(info))
-
+        return done, step_ct
 
