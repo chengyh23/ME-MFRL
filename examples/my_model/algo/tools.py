@@ -401,7 +401,7 @@ class Runner(object):
             print('\n[INFO] {}'.format(info))
             if self.use_wandb:
                 import wandb
-                wandb.log({'R/pred': info['predator']['mean_reward'],'R/prey': info['prey']['mean_reward']})
+                wandb.log({'R/pred': info['predator']['mean_reward'],'R/prey': info['prey']['mean_reward']}, step=iteration)
             if self.save_every and (iteration + 1) % self.save_every == 0:
                 print(Color.INFO.format('[INFO] Saving model ...'))
                 self.models[0].save(self.model_dir + '-predator', iteration)

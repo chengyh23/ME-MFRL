@@ -51,7 +51,7 @@ def spawn_ai(algo):
     action_dim = env.action_space[0].shape[0]
     action_bound = env.action_space[0].high[0]  # 动作最大值
     
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cuda:2") if torch.cuda.is_available() else torch.device("cpu")
     
     agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
     return agent
@@ -80,6 +80,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--noisy_obs', action='store_true', help='add noise to observation')   # 
     parser.add_argument('--noisy_factor', type=int, default=1, help='magnitude of noise added to relative obsrvation')
+    parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
+    parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
     parser.add_argument('--algo', type=str, default='ddpg', help='choose an algorithm from the preset')
     parser.add_argument('--n_round', type=int, default=500, help='set the trainning round')
     parser.add_argument('--max_steps', type=int, default=400, help='set the max steps')
@@ -94,7 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_max_steps', type=int, default=100, help='set the test max steps')
     
     args = parser.parse_args()
-    _name = "se-R10"    # silly evader (fixed behavior)
+    _name = "re"    # silly evader (fixed behavior)
     _name += f"/no{args.noisy_factor}" if args.noisy_obs else "/ao" # noiobs OR accobs
     _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
     print("[CONFIGURATION]", _name)
@@ -120,11 +122,14 @@ if __name__ == '__main__':
     minimal_size = 100
     batch_size = 64
     replay_buffer = rl_utils.ReplayBuffer(buffer_size)
+    from examples.my_model.scenario_my1 import ModelEvader
     agent = spawn_ai(args.algo)  # model
+    models = [None,
+              ModelEvader('repulsive', env, args.use_kf_act)]
     if not args.test:   # train
         return_list = rl_utils.train_off_policy_agent(
             env, agent, args.n_round, args.max_steps, replay_buffer, minimal_size, batch_size, 
-            use_wandb=args.use_wandb, model_dir=model_dir, train=True, log_dir=log_dir)
+            models, use_wandb=args.use_wandb, model_dir=model_dir, train=True, log_dir=log_dir)
     elif args.test: # test
         agent.load(model_dir + '-predator', step=args.idx[0])
         dones, step_cts = rl_utils.train_off_policy_agent(

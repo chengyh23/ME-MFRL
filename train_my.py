@@ -1,6 +1,7 @@
 """Self Play
 
 ```
+python train_my.py --algo dqn --test --test_n_round 100 --render --render_every 30 --noisy_obs --use_kf_act  --kf_proc_model cv --idx 4999
 python train_my.py --algo ppo --n_round 2000
 ```
 """
@@ -80,11 +81,12 @@ if __name__ == '__main__':
     parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
     parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
     parser.add_argument('--algo', type=str, choices={'attention_mfq', 'ac', 'mfac', 'mfq', 'dqn', 'me_mfq','me_mfq_leg','ppo','sac'}, help='choose an algorithm from the preset', required=True)
+    parser.add_argument('--start_round', type=int, default=0, help='set the trainning round')
     parser.add_argument('--n_round', type=int, default=500, help='set the trainning round')
     parser.add_argument('--max_steps', type=int, default=400, help='set the max steps')
     parser.add_argument('--num_adversaries', type=int, default=3, help='number of predators')
     parser.add_argument('--num_good_agents', type=int, default=1, help='number of preys')
-    parser.add_argument('--seed', type=int, default=1, help='random seed')
+    parser.add_argument('--seed', type=int, default=0, help='random seed')
     parser.add_argument('--map_size', type=int, default=40, help='set the size of map')  # then the amount of agents is 64
     parser.add_argument('--order', type=int, default=4, help='moment order')
     parser.add_argument('--render', action='store_true', help='[for train] render or not (if true, will render every save)')
@@ -103,11 +105,12 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     # _name = ""
-    _name = "se-R10"    # silly evader (fixed behavior)
+    _name = "re-Rsrspure"    # se: silly evader (fixed behavior) rect path, re: repulsive evader,
     _name += f"/no" if args.noisy_obs else "/ao" # noiobs OR accobs
     # _name += f"/no{args.noisy_factor}" if args.noisy_obs else "/ao" # noiobs OR accobs
     _name += f"/ka_{args.kf_proc_model}" if args.use_kf_act else "/eg"    # kfact OR epsgr
-    _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
+    # _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
+    _name += f"/{args.algo}_Xx{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
     # if args.use_kf_act:
     #     _name = f"kfv4_{args.kf_proc_model}/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
     # else:
@@ -140,18 +143,19 @@ if __name__ == '__main__':
     else:
         use_mf = False
 
-    start_from = 0
 
     sess = tf.Session(config=tf_config)
     from examples.my_model.scenario_my1 import ModelEvader
     models = [spawn_ai(args.algo, sess, env, None, args.algo + '-predator', args.max_steps, args.use_kf_act, args.order),
-              ModelEvader('repulsive', env)]
+              ModelEvader('repulsive', env, args.use_kf_act)]
             #   None]
             #   spawn_ai(args.algo, sess, env, None, args.algo + '-prey', args.max_steps, args.use_kf_act, args.order)]
 
     sess.run(tf.global_variables_initializer())
     
     if not args.test:   # train
+        if args.start_round > 0:
+            models[0].load(model_dir + '-predator', step=args.start_round-1)
         # if not args.render_every == args.save_every:
         #     raise Warning("Attention: render_every != save_every")
         runner = tools.Runner(sess, env, None, args.map_size, args.max_steps, models, play,
@@ -159,7 +163,7 @@ if __name__ == '__main__':
                                 log_dir=log_dir, model_dir=model_dir, train=True, use_kf_act=args.use_kf_act, use_wandb=args.use_wandb)
         print(f'\n\nnoisy_obs: {args.noisy_obs}, use_kf_act: {args.use_kf_act}, kf_proc_model: {args.kf_proc_model}')
         print("\n\n=== {0} ROUNDs x {1} STEPs ===".format(args.n_round, args.max_steps))
-        for k in range(start_from, start_from + args.n_round):
+        for k in range(args.start_round, args.start_round + args.n_round):
             eps = linear_decay(k, [0, int(args.n_round * 0.8), args.n_round], [1, 0.2, 0.1])
             runner.run(eps, k)
     elif args.test:

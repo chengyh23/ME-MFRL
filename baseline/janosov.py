@@ -1,5 +1,9 @@
 """
 Janosov, Milán, et al. "Group chasing tactics: how to catch a faster prey." New Journal of Physics 19.5 (2017): 053003.
+
+```
+python baseline/janosov.py --algo janosov --test --test_n_round 100  --noisy_obs --test_noisy_factor 4
+```
 """
 import os
 import argparse
@@ -61,24 +65,22 @@ class ModelPursuerJanosov(ModelPursuer):
         escapers = [agent for agent in self.env.agents if agent.adversary==False]
         
         # Keep consistent with the environment
+        N = len(escapers)
+        escaper_positions = np.zeros((N,2))
+        escaper_velocities = np.zeros((N,2))
+        for j, escaper in enumerate(escapers):
+            # _start = -1*2*(N-j) + len(_single_obs)
+            # _end = -1*2*(N-j-1) + len(_single_obs)
+            # escaper_positions[j] = _single_obs[_start:_end] + chaser_pos
+            # escaper_velocities[j] = escaper.state.p_vel
+            escaper_positions[j] = escaper.kf.x[:2]
+            escaper_velocities[j] = escaper.kf.x[2:]
+            
         chaser_velocities = np.zeros((len(chasers), 2))
-        
         for i, chaser in enumerate(chasers):
             _single_obs = obs[i]
             # chaser_pos = chaser.state.p_pos
             chaser_pos = _single_obs[2:4]
-            
-            N = len(escapers)
-            escaper_positions = np.zeros((N,2))
-            escaper_velocities = np.zeros((N,2))
-            for j, escaper in enumerate(escapers):
-                # _start = -1*2*(N-j) + len(_single_obs)
-                # _end = -1*2*(N-j-1) + len(_single_obs)
-                # escaper_positions[j] = _single_obs[_start:_end] + chaser_pos
-                # escaper_velocities[j] = escaper.state.p_vel
-                escaper_positions[j] = escaper.kf.x[:2]
-                escaper_velocities[j] = escaper.kf.x[2:]
-                
             closest_escaper_index = np.argmin(np.linalg.norm(escaper_positions - chaser_pos, axis=1))
             closest_escaper_pos, closest_escaper_vel = escaper_positions[closest_escaper_index], escaper_velocities[closest_escaper_index]
             predicted_pos = self.predict_position(closest_escaper_pos, closest_escaper_vel)
@@ -89,11 +91,11 @@ class ModelPursuerJanosov(ModelPursuer):
             chaser_desired_vel *= 10.0
             # print('TARGET', chaser_desired_vel)
             
-            # # Add repulsion from other chasers
-            # for k, chaser_k in enumerate(chasers):
-            #     if k==i: continue
-            #     chaser_desired_vel += self.repulsion_force(chaser_pos, chaser_k.state.p_pos)
-            #     # print(k, 'REPULSI', self.repulsion_force(chaser_pos, chaser_k.state.p_pos))
+            # Add repulsion from other chasers
+            for k, chaser_k in enumerate(chasers):
+                if k==i: continue
+                chaser_desired_vel += self.repulsion_force(chaser_pos, chaser_k.state.p_pos)
+                # print(k, 'REPULSI', self.repulsion_force(chaser_pos, chaser_k.state.p_pos))
             
             # Update chaser's velocity (simple Euler integration)
             chaser_velocities[i] += chaser_desired_vel
@@ -352,6 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--idx', nargs='*', help="required=True if testing")
     parser.add_argument('--test_n_round', type=int, default=100, help='set the testing round')
     parser.add_argument('--test_max_steps', type=int, default=100, help='set the test max steps')
+    parser.add_argument('--test_noisy_factor', type=int, default=1, help='magnitude of noise added to relative obsrvation')
     
     args = parser.parse_args()
     # >>>>>>>>> Default Setting
@@ -368,13 +371,13 @@ if __name__ == '__main__':
     if not (args.use_kf_act and args.kf_proc_model=='cv'):
         raise Exception("in Janosov you need to use KF and constant velocity model~")
     env = make_env('exp_tag1',num_adversaries=args.num_adversaries, num_good_agents=args.num_good_agents, \
-        noisy_obs=args.noisy_obs, noisy_factor=args.noisy_factor,use_kf_act=args.use_kf_act, kf_proc_model=args.kf_proc_model, \
+        noisy_obs=args.noisy_obs, noisy_factor=args.test_noisy_factor,use_kf_act=args.use_kf_act, kf_proc_model=args.kf_proc_model, \
         discrete_action_space=True, discrete_action_input=True, benchmark=True)
     log_dir, model_dir, render_dir = name2dir(_name, args)
     print("\n\nOutput to {} and {}".format(log_dir, model_dir))
     
     models = [ModelPursuerJanosov('janosov', env),
-              ModelEvader('repulsive', env)]
+              ModelEvader('repulsive', env, args.use_kf_act)]
     
     if not args.test:   # train
         print("Hey, Janosov don't have to be trained.")

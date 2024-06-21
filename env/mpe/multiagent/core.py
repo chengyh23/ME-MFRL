@@ -223,11 +223,11 @@ class EvaderRepulsive(Evader):
 
         evader_pos = self.state.p_pos
         direction = evader_pos - pursuer_pos
-        distance = np.linalg.norm(direction)
-        if distance == 0:
+        _d = np.linalg.norm(direction)
+        if _d == 0:
             return np.zeros_like(evader_pos)  # Avoid division by zero
-        force_magnitude = C_PURSUER_REPULSION / (distance ** 2)  # Inverse-square law
-        force = force_magnitude * direction / distance
+        # force = direction / (_d **2)
+        force = direction / (_d **3)
         return force
     
     def compute_boundary_force(self):
@@ -235,25 +235,50 @@ class EvaderRepulsive(Evader):
         
         force = np.zeros_like(self.state.p_pos)
         xmin, xmax, ymin, ymax = -1, +1, -1, +1
-        buffer_d = 0.3
         x, y = self.state.p_pos[0], self.state.p_pos[1]
-        if x < xmin + buffer_d:
-            force[0] += C_BOUNDARY_REPULSION / (x - xmin) ** 2
-        elif x > xmax - buffer_d:
-            force[0] -= C_BOUNDARY_REPULSION / (xmax - x) ** 2
+        # buffer_d = 0.3
+        # if x < xmin + buffer_d:
+        #     force[0] += C_BOUNDARY_REPULSION / (x - xmin) ** 2
+        # elif x > xmax - buffer_d:
+        #     force[0] -= C_BOUNDARY_REPULSION / (xmax - x) ** 2
 
-        if y < ymin + buffer_d:
-            force[1] += C_BOUNDARY_REPULSION / (y - ymin) ** 2
-        elif y > ymax - buffer_d:
-            force[1] -= C_BOUNDARY_REPULSION / (ymax - y) ** 2
+        # if y < ymin + buffer_d:
+        #     force[1] += C_BOUNDARY_REPULSION / (y - ymin) ** 2
+        # elif y > ymax - buffer_d:
+        #     force[1] -= C_BOUNDARY_REPULSION / (ymax - y) ** 2
+            
+        force[0] += C_BOUNDARY_REPULSION / (x - xmin) ** 2
+        force[0] -= C_BOUNDARY_REPULSION / (xmax - x) ** 2
+        force[1] += C_BOUNDARY_REPULSION / (y - ymin) ** 2
+        force[1] -= C_BOUNDARY_REPULSION / (ymax - y) ** 2
+        
+        return force
+    
+    def bounded_force(self, force):
+        xmin, xmax, ymin, ymax = -1, +1, -1, +1
+        x, y = self.state.p_pos[0], self.state.p_pos[1]
+        buffer_d = 0.1
+        
+        if x < xmin + buffer_d and force[0] < 0:
+            force[0] = max(0,xmin + buffer_d - x)
+        elif x > xmax - buffer_d and force[0] > 0:
+            force[0] = min(0,xmax - buffer_d - x)
 
+        if y < ymin + buffer_d and force[1] < 0:
+            force[1] = max(0, ymin + buffer_d - y)
+        elif y > ymax - buffer_d and force[1] > 0:
+            force[1] = min(0, ymax - buffer_d - y)
         return force
     
     def _get_act(self, discrete_action_space: bool, pursuers_positions):
+        # print('evader', self.state.p_pos)
         total_force = np.zeros_like(self.state.p_pos)
         for pursuer_pos in pursuers_positions:
             total_force += self.compute_repulsive_force(pursuer_pos)
+            # print(self.compute_repulsive_force(pursuer_pos), pursuer_pos)
         total_force += self.compute_boundary_force()
+        # print('boudary',self.compute_boundary_force())
+        # total_force = self.bounded_force(total_force)
         
         if discrete_action_space:
             from baseline.janosov import cont2discrete_act

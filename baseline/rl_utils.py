@@ -61,7 +61,7 @@ def train_on_policy_agent(env, agent, num_episodes):
     return return_list
 
 def train_off_policy_agent(env, agent, n_round, max_steps, replay_buffer, minimal_size, batch_size, 
-                           use_wandb=False, print_every=50, save_every=50, model_dir=None, train=False, log_dir=None):
+                           models, use_wandb=False, print_every=50, save_every=50, model_dir=None, train=False, log_dir=None):
     
     if train:
         writer = SummaryWriter(log_dir=log_dir)
@@ -87,6 +87,7 @@ def train_off_policy_agent(env, agent, n_round, max_steps, replay_buffer, minima
         
         mean_rewards = [[] for _ in range(n_group)]
         state = env.reset()
+        
         done = False
         acts = [np.zeros((max_nums[i],), dtype=np.int32) for i in range(n_group)]
         step_ct = 0
@@ -97,9 +98,7 @@ def train_off_policy_agent(env, agent, n_round, max_steps, replay_buffer, minima
                     acts[i] = agent.take_action(state[:num_pred], train=train)
                 elif i==1:
                     # acts[i] = np.random.normal([0,0],size=(num_prey,2))
-                    preys = [_a for _a in env.agents if _a.adversary==False]
-                    from examples.my_model.scenario_my1 import _get_act_preys
-                    acts[1] = _get_act_preys(preys, env)
+                    acts[i] = models[i].act(state[num_pred:])
                     
             stack_act = np.concatenate(acts, axis=0)
             next_state, all_rewards, all_done, _ = env.step(stack_act)

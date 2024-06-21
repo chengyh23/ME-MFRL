@@ -1,0 +1,31 @@
+-- Background
+An evader is being pursuited by N pursuers (N=3) within a square area. 
+The evader will run away when pursuers approach it. 
+The goal is to decide the reward for reinforcement learning so that the algorithm for pursuers learns how to capture the evader as soon as possible. 
+State space: [-1,1] x [-1,1]. Each agent locates in the square area, its position is represented by two floats as [x, y]. 
+Please provide the reward (scoring function) for the given configuration of pursuers and evader.
+
+-- Input format
+\input: [position_pursuer_0, position_pursuer_1, position_pursuer_2], [position_evader]
+(Note: input should start with string "\input: ", and then provide the position of pursuers and the evader.)
+
+-- Output format
+\output: reward
+(Note: output should start with string "\output: ", and then provide a float number rewarding pursuers' current states given the evader's state. 
+The value can be interpreted as evaluating pursuers' current potential of capturing the evader. The higher the potential, the greater the output value should be.)
+
+-- Example
+    -- my input:
+    \input: [[-0.5, 0.5], [-0.5, -0.5], [0.5, 0.0]], [0.0, 0.0]
+    -- your output:
+    \output: 2.0
+
+-- Requirements
+    1. Please verify the input format. Strings that do not meet the input format should be handled as errors, and in case of an error, only respond with 'error'. 
+    2. Please strictly adhere to the specified format when responding. 
+
+-- Task
+Please strictly follow the above instructions and requirements when responding to my input. Only reply according to the specified format and refrain from any descriptive text. 
+
+-- Confirmation
+If you understand the above requirements, please only reply 'yes'. 

@@ -1,0 +1,31 @@
+-- Background
+An evader is being pursuited by N pursuers (N=3) within a square area. 
+The evader will run away when pursuers approach it. 
+The goal is to decide pursuers' actions so that they can capture the evader as soon as possible. 
+State space: [-1,1] x [-1,1]. Each agent locates in the square area, its position is represented by two floats as [x, y]. 
+Action space: (0, 1, 2, 3, 4). The pursuer's action is discretized into five options: {0: (0, 0), 1: (-1, 0), 2: (+1, 0), 3: (0, -1), 4: (0, +1)}. Each pursuer's action is represented by an interger.
+Please provide the optimal action (direction) for all the pursuers.
+
+-- Input format
+\input: [position_pursuer_0, position_pursuer_1, position_pursuer_2], [position_evader]
+(Note: input should start with string "\input: ", and then provide the position of pursuers and the evader
+
+-- Output format
+\output: [action_pursuer_0, action_pursuer_1, action_pursuer_2]
+(Note: output should start with string "\output: ", and then provide the discrete action of each pursuer
+
+-- Example
+    -- my input:
+    \input: [[-0.5, 0.5], [-0.5, -0.5], [0.5, 0.0]], [0.0, 0.0]
+    -- your output:
+    \output: [2, 4, 1]
+
+-- Requirements
+    1. Please verify the input format. Strings that do not meet the input format should be handled as errors, and in case of an error, only respond with 'error'. 
+    2. Please strictly adhere to the specified format when responding. 
+
+-- Task
+Please strictly follow the above instructions and requirements when responding to my input. Only reply according to the specified format and refrain from any descriptive text. 
+
+-- Confirmation
+If you understand the above requirements, please only reply 'yes'. 

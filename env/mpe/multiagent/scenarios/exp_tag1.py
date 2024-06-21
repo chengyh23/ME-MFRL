@@ -93,7 +93,8 @@ class Scenario(BaseScenario):
             agent.size = 0.075 if agent.adversary else 0.05
             agent.accel = 3.0 if agent.adversary else 4.0
             #agent.accel = 20.0 if agent.adversary else 25.0
-            agent.max_speed = 1.0 if agent.adversary else 1.3
+            # agent.max_speed = 1.0 if agent.adversary else 1.3
+            agent.max_speed = 1.0
         # add landmarks
         world.landmarks = [Landmark() for i in range(num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
@@ -116,11 +117,12 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.25, 0.25, 0.25])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-0.2, +0.2, world.dim_p)
-            if isinstance(agent, Evader):
-                _x, _y = agent.sample_initial_pos()
-                # agent.state.p_pos = np.array([agent.x1,agent.y1])
-                agent.state.p_pos = np.array([_x, _y])
+            agent.state.p_pos = np.random.uniform(-1.0, +1.0, world.dim_p)
+            # agent.state.p_pos = np.random.uniform(-0.2, +0.2, world.dim_p)
+            # if isinstance(agent, Evader):
+            #     _x, _y = agent.sample_initial_pos()
+            #     # agent.state.p_pos = np.array([agent.x1,agent.y1])
+            #     agent.state.p_pos = np.array([_x, _y])
                 
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
@@ -190,8 +192,8 @@ class Scenario(BaseScenario):
         return main_reward
     
     def pursuer_reward(self, agent, world):
-        R_CAPTOR = +10
-        R_HELPER = +6
+        R_CAPTOR = +100
+        R_HELPER = +60
         
         evader = self.good_agents(world)[0]
         adversaries = self.adversaries(world)
@@ -204,11 +206,86 @@ class Scenario(BaseScenario):
         rew = 0.0
         if role == 'captor':
             rew += R_CAPTOR
-        elif role == 'helper': 
+        elif role == 'helper':
             rew += R_HELPER
         else:
-            rew += -0.1 * np.sqrt(np.sum(np.square(agent.state.p_pos - evader.state.p_pos)))
+            _d = np.sqrt(np.sum(np.square(agent.state.p_pos - evader.state.p_pos)))
+            # rew += 1 / (_d + 1e-3)
+            # if _d>4: 
+            #     print(agent.state.p_pos, evader.state.p_pos)
+            #     raise Exception
+            rew += -1 * _d
+            # rew += -1 * _d *_d
+            # dr = -0.1 * np.sqrt(np.sum(np.square(agent.state.p_pos - evader.state.p_pos)))
+            # print(dr)
+            
+            
+        pursuers_positions = []
+        for pursuer in adversaries:
+            pursuers_positions.append(pursuer.state.p_pos)
+        # # # Formation
+        # # from scipy.spatial import ConvexHull
+        # # hull = ConvexHull(pursuers_positions)
+        # # rew += hull.volume
+        
+        # # >>>>>>>>>>>> Formation Score ([0,2]) >>>>>>>>>>>>>>>
+        # _idx0 = np.argmin(np.linalg.norm(evader.state.p_pos - pursuers_positions,axis=1))
+        # d0 = evader.state.p_pos - pursuers_positions[_idx0]
+        # assert np.linalg.norm(d0)>0, "Zero norm vector?"
+        # d0 = d0 / np.linalg.norm(d0)
+        # q = 0
+        # for pos in pursuers_positions:
+        #     di = evader.state.p_pos - pos
+        #     assert np.linalg.norm(di)>0, "Zero norm vector?"
+        #     di = di / np.linalg.norm(di)
+        #     q += np.dot(di, d0) + 1
+        # q = q / len(pursuers_positions)
+        # rew += -1 * q
+        
+        # # >>>>>>>>>>>>> Directional diversity >>>>>>>>>>>>>
+        # dd = 0.0
+        # for pos1 in pursuers_positions:
+        #     for pos2 in pursuers_positions:
+        #         vec1 = pos1 - evader.state.p_pos
+        #         vec2 = pos2 - evader.state.p_pos
+        #         if np.linalg.norm(vec1) != 0 and np.linalg.norm(vec2) != 0:
+        #             # angular similarity
+        #             cos_theta = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+        #             dd += -cos_theta
+        # rew += dd
+        
+        # >>>>>>>>>>>>> Safe reachable set Area >>>>>>>>>>>>
+        from baseline.safe_reach_set import perpendicular_bisector, line_cut_rect
+        from shapely.geometry import box
+        from shapely import intersection_all
+        rect = box(-1, -1, 1, 1)  # Rectangle from (0,0) to (10,10)
+        clipped_polygons = []
+        for pursuer in adversaries:
+            p1 = pursuer.state.p_pos
+            p2 = evader.state.p_pos
+            a,b,c = perpendicular_bisector(p1,p2)
+            pg = line_cut_rect(a,b,c, rect, p2)
+            clipped_polygons.append(pg)
+        # Find the intersection of all clipped polygons
+        common_region = intersection_all(clipped_polygons)
+        # print(common_region.area, pursuers_positions, evader.state.p_pos)
+        _area = common_region.area
+        # rew += - _area ** 2
+        rew -= _area
+        
+        # # >>>>>>>>>>>>>>> Repulsive force >>>>>>>>>>>>>>
+        # for i in range(len(pursuers_positions)):
+        #     for j in range(i,len(pursuers_positions)):
+        #         dist = np.linalg.norm(pursuers_positions[i] - pursuers_positions[j])
+        #         R_REPULSI = 0.2   # Interaction distance between chasers
+        #         if dist < R_REPULSI:
+        #             rew += -1 / dist
+        
+        # # # >>>>>>>>>>>>>>> LLM >>>>>>>>>>>>>>>>>
+        # from llm.llm import act_gpt
+        # rew = act_gpt(pursuers_positions, evader.state.p_pos)
         return rew
+    
     def evader_reward(self, agent, world):
         adversaries = self.adversaries(world)
         captured = False
@@ -287,9 +364,11 @@ class Scenario(BaseScenario):
         dist = np.sqrt(np.sum(np.square(delta_pos)))
         noise_mean = 0
         # noise_std_dev = 1.0 * dist
-        noise_std_dev = self.noisy_factor * dist
+        # noise_std_dev = self.noisy_factor * dist * 0.05
+        noise_std_dev = self.noisy_factor * dist * 0.2
         noise = np.random.normal(noise_mean, noise_std_dev, size=delta_pos.shape)
         delta_pos_noisy = delta_pos + noise
+        # print(self.noisy_factor, noise_std_dev, delta_pos, noise)
         return delta_pos_noisy
     
     def observation(self, agent, world):

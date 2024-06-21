@@ -92,9 +92,11 @@ def kf_step(env,all_info,num_pred):
     # # each agent use cov of its opponent agents
     # cov = [np.tile(prey_cov, (num_pred,1)), np.tile(pred_cov, (num_prey,1))]
 class ModelEvader:
-    def __init__(self, algo_name, env):
+    def __init__(self, algo_name, env, use_kf_act):
         self.algo_name = algo_name
         self.env = env
+        self.use_kf_act = use_kf_act
+        
     def act(self, obs):
         pursuers = [agent for agent in self.env.agents if agent.adversary==True]
         evaders = [agent for agent in self.env.agents if agent.adversary==False]
@@ -104,10 +106,29 @@ class ModelEvader:
         else:
             actions = np.zeros((len(evaders),2), dtype=np.float32)
         
+        # Retrive pursuers' positions from observation (of KF)
         pursuers_positions = []
-        for i,pursuer in enumerate(pursuers):
-            pursuers_positions.append(pursuer.kf.x[:2])
-        
+        if self.use_kf_act:
+            for i,pursuer in enumerate(pursuers):
+                pursuers_positions.append(pursuer.kf.x[:2])
+        else:
+            # for i in range(len(pursuers)):  # observed
+            #     pos_obs = []
+            #     for j in range(len(evaders)):   # observer
+            #         observer_pos = obs[j][2:4]
+            #         _start = 4+i*2
+            #         rel_pos = obs[j][_start:_start+2]
+            #         pos_obs.append(rel_pos + observer_pos)
+            #     pursuer_position = np.mean(pos_obs, axis=0)
+            #     pursuers_positions.append(pursuer_position)
+            for i in range(len(pursuers)):
+                _start = 4+i*2
+                rel_pos = obs[0][_start:_start+2]
+                pursuers_positions.append(rel_pos + evaders[0].state.p_pos)
+            # print(obs[0])
+            # print(pursuers_positions)
+            # print(pursuers[0].state.p_pos, pursuers[1].state.p_pos, pursuers[2].state.p_pos)
+            
         for i,evader in enumerate(evaders):
             actions[i] = evader._get_act(self.env.discrete_action_space, pursuers_positions=pursuers_positions)
         return actions
