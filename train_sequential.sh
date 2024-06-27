@@ -37,12 +37,12 @@ for seed in "${seeds[@]}"; do
     # # Mv1
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_wandb
-    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 1500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
     
-    python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 5 --use_wandb
-    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_wandb
-    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 6 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 6 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 6 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 5 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
     
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 7 --use_wandb
@@ -54,6 +54,16 @@ for seed in "${seeds[@]}"; do
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_kf_act --kf_proc_model cv --use_wandb
     # python "$temp_dir/train_my.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --noisy_factor 2 --use_kf_act --kf_proc_model rw --use_wandb
+    
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.4 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.4 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.4 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 1500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
+    
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.6 --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.6 --noisy_obs --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 5000 --max_steps 400 --seed "$seed" --num_adversaries 3 --eps_k 0.6 --noisy_obs --use_kf_act --kf_proc_model cv --use_wandb
+    # python "$temp_dir/train_my.py" --algo "$algo" --n_round 1500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_kf_act --kf_proc_model rw --use_wandb
     
     # python "$temp_dir/baseline/rl_torch.py" --algo "$algo" --n_round 500 --max_steps 400 --seed "$seed" --num_adversaries 3 --noisy_obs --use_wandb
     # # MvN

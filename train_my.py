@@ -80,6 +80,7 @@ if __name__ == '__main__':
     parser.add_argument('--noisy_factor', type=int, default=1, help='magnitude of noise added to relative obsrvation')
     parser.add_argument('--use_kf_act', action='store_true', help='maintain KF and use it to guide action selection')   # 1) maintain a KF for each agent, 2) update KF at each step, 3) ValueNet select action guided by KF, 
     parser.add_argument('--kf_proc_model', type=str, default='cv', help='KF Process model')
+    parser.add_argument('--eps_k', type=float, default=0.2, help='param in ValueNet act() epsilon greedy')
     parser.add_argument('--algo', type=str, choices={'attention_mfq', 'ac', 'mfac', 'mfq', 'dqn', 'me_mfq','me_mfq_leg','ppo','sac'}, help='choose an algorithm from the preset', required=True)
     parser.add_argument('--start_round', type=int, default=0, help='set the trainning round')
     parser.add_argument('--n_round', type=int, default=500, help='set the trainning round')
@@ -108,7 +109,9 @@ if __name__ == '__main__':
     _name = "re-Rsrspure"    # se: silly evader (fixed behavior) rect path, re: repulsive evader,
     _name += f"/no" if args.noisy_obs else "/ao" # noiobs OR accobs
     # _name += f"/no{args.noisy_factor}" if args.noisy_obs else "/ao" # noiobs OR accobs
-    _name += f"/ka_{args.kf_proc_model}" if args.use_kf_act else "/eg"    # kfact OR epsgr
+    # _name += f"/ka_{args.kf_proc_model}_{int(args.eps_k*10)}" if args.use_kf_act else f"/eg_{int(args.eps_k*10)}"    # kfact OR epsgr
+    # _name += f"/ka_{args.kf_proc_model}" if args.use_kf_act else "/eg"    # kfact OR epsgr
+    _name += f"/ka_{args.kf_proc_model}_fixe1" if args.use_kf_act else "/eg"    # fixe1: w/o uncertainty-guided adaptation
     # _name += f"/{args.algo}_{args.n_round}x{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
     _name += f"/{args.algo}_Xx{args.max_steps}/{args.num_adversaries}v{args.num_good_agents}/{args.seed}"
     # if args.use_kf_act:
@@ -146,7 +149,7 @@ if __name__ == '__main__':
 
     sess = tf.Session(config=tf_config)
     from examples.my_model.scenario_my1 import ModelEvader
-    models = [spawn_ai(args.algo, sess, env, None, args.algo + '-predator', args.max_steps, args.use_kf_act, args.order),
+    models = [spawn_ai(args.algo, sess, env, None, args.algo + '-predator', args.max_steps, args.use_kf_act, args.eps_k, args.order),
               ModelEvader('repulsive', env, args.use_kf_act)]
             #   None]
             #   spawn_ai(args.algo, sess, env, None, args.algo + '-prey', args.max_steps, args.use_kf_act, args.order)]

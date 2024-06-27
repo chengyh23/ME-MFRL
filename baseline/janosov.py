@@ -410,6 +410,12 @@ if __name__ == '__main__':
         avg_steps_ct = np.mean(step_cts)
         print("[CONFIGURATION]", _name)
         print(f"Success rate: {success_rate} | Avg steps {avg_steps_ct}")
+        from test_my import log_to_csv
+        import sys
+        import time
+        cmd = ' '.join(sys.argv)
+        _time = time.time()
+        log_to_csv(_name, success_rate, avg_steps_ct, cmd, _time)
     
 
 def gpt_version():

@@ -249,8 +249,10 @@ from tensorboard.backend.event_processing import event_accumulator
 from tqdm import tqdm
 
 def get_tfboard_data(metric='Agent_0_kill_op', seeds=[0, 3, 7], smoothing_tensorboard=0.99):
+    out_dir = 'common/fig'
     group_name = 'obs_act'
-    groups = ['ao-eg', 'no-eg', 'no-ka_rw', 'no-ka_cv']
+    # groups = ['ao-eg', 'no-eg', 'no-ka_rw', 'no-ka_cv']
+    groups = ['ao-eg', 'no-eg']
     
     data = []
     for group in groups:
@@ -279,10 +281,18 @@ def get_tfboard_data(metric='Agent_0_kill_op', seeds=[0, 3, 7], smoothing_tensor
         df.append(pd.DataFrame(data[i]).melt(var_name='episode',value_name=metric))
         df[i][group_name]= groups[i]
     df=pd.concat(df) # 合并
+    df["observation"] = df["obs_act"].map({"ao-eg":"w/o noise","no-eg":"w/ noise"})
+    group_name = "observation"
     print(df.head())
+    sns.set_style("whitegrid")
     sns.lineplot(data=df,x="episode", y=metric, hue=group_name, style=group_name)
-    plt.title(f"{group_name}-{metric}")
-    plt.savefig(f'common/{group_name}-{metric}.png', dpi=300)
+    # plt.title(f"{group_name}-{metric}")
+    plt.xlabel("training round")
+    # plt.ylabel("capture probability")
+    plt.ylabel("# steps taken")
+    # plt.savefig(f'common/{group_name}-{metric}.png', dpi=300)
+    # plt.savefig(f'common/fig/round_SR.png', dpi=300)
+    plt.savefig(f'common/fig/round_avg_steps.png', dpi=300)
     plt.clf()
 # import tensorflow as tf
 # def read_event_file():
@@ -304,7 +314,7 @@ def get_tfboard_data(metric='Agent_0_kill_op', seeds=[0, 3, 7], smoothing_tensor
 
 
 if __name__ == '__main__':
-    get_data7()
+    # get_data7()
     # get_tfboard_data(metric='Agent_0_kill_op')
-    # get_tfboard_data(metric='Agent_0_step_ct_op')
+    get_tfboard_data(metric='Agent_0_step_ct_op')
     # read_event_file()

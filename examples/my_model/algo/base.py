@@ -13,7 +13,7 @@ class Color:
     ERROR = '\033[1;31m{}\033[0m'
 
 class ValueNet:
-    def __init__(self, sess, name, handle, env, update_every=5, use_mf=False, use_kf_act=False, attention=False, learning_rate=1e-4, tau=0.005, gamma=0.95):
+    def __init__(self, sess, name, handle, env, update_every=5, use_mf=False, use_kf_act=False, eps_k=0.2, attention=False, learning_rate=1e-4, tau=0.005, gamma=0.95):
         # assert isinstance(env, GridWorld)
         self.env = env
         self.name = name
@@ -26,6 +26,7 @@ class ValueNet:
         self.update_every = update_every
         self.use_mf = use_mf  # trigger of using mean field
         self.use_kf_act = use_kf_act
+        self.eps_k = eps_k
         self.attention = attention  # trigger of using attention mechanism
         self.temperature = 0.1
 
@@ -195,12 +196,17 @@ class ValueNet:
             # else:
             #     actions = np.argmax(pi, axis=1).astype(np.int32)
                 
-            if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:   # exploration
+            # if np.random.rand() < 0.2 * kwargs['eps'] - 0.15:   # exploration   (default)
             # if np.random.rand() < 0.4 * kwargs['eps'] - 0.15:   # exploration   (E4)
             # if np.random.rand() < 0.6 * kwargs['eps'] - 0.15:   # exploration   (E6)
+            # print(f'[epsilon-greedy] {self.eps_k}')
+            if np.random.rand() < self.eps_k * kwargs['eps'] - 0.15:
                 # print('wow! exploring~')
                 if self.use_kf_act and np.random.rand() < sigmoid(-Uc)*0.5:  # KF-guided exploration
+                # if self.use_kf_act and np.random.rand() < 0.5:  # KF-guided exploration w/o uncertainty-guided adapatation
+                # if self.use_kf_act and np.random.rand() < 0.2:  # KF-guided exploration w/o uncertainty-guided adapatation
                     # print('KF guided', Uc)
+                    # print('KF guided w/o uncertainty-guided adaptation')
                     actions = self._kf_guided_act()
                 else:   # random exploration
                     # print('randomly')

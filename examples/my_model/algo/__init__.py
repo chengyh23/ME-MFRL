@@ -17,7 +17,7 @@ DiscretePPO = ppo.DiscretePPO
 # SAC = sac.SAC
 DiscreteSAC = sac.DiscreteSAC
 
-def spawn_ai(algo_name, sess, env, handle, human_name, max_steps, use_kf_act, moment_order=4):
+def spawn_ai(algo_name, sess, env, handle, human_name, max_steps, use_kf_act, eps_k, moment_order=4):
     if algo_name == 'mfq':
         model = MFQ(sess, human_name, handle, env, max_steps, memory_size=80000)
     elif algo_name == 'attention_mfq':
@@ -27,7 +27,7 @@ def spawn_ai(algo_name, sess, env, handle, human_name, max_steps, use_kf_act, mo
     elif algo_name == 'ac':
         model = AC(sess, human_name, handle, env)
     elif algo_name == 'dqn':
-        model = DQN(sess, human_name, handle, env, max_steps, memory_size=80000, use_kf_act=use_kf_act)
+        model = DQN(sess, human_name, handle, env, max_steps, memory_size=80000, use_kf_act=use_kf_act, eps_k=eps_k)
     elif algo_name == 'me_mfq':
         model = MEMFQ(sess, human_name, handle, env, max_steps, memory_size=80000,moment_order=moment_order)
     elif algo_name == 'me_mfq_leg':
